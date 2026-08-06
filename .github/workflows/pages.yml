@@ -1,0 +1,49 @@
+# Déploiement de la carte sur GitHub Pages.
+#
+# Le constructeur Pages historique (« Deploy from a branch ») échouait
+# systématiquement sur ce dépôt : le job de build atteignait son plafond de
+# 15 minutes et était coupé, sans jamais publier. Les 12 Mo de GeoJSON en sont
+# la cause probable.
+#
+# Ce workflow contourne le problème : il téléverse le dossier tel quel comme
+# artefact, puis le déploie. Aucun traitement Jekyll, aucune transformation —
+# le site est déjà du HTML statique.
+
+name: Déploiement GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Un déploiement à la fois, sans interrompre celui qui est en cours.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploiement:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploiement.outputs.page_url }}
+    steps:
+      - name: Récupération du dépôt
+        uses: actions/checkout@v4
+
+      - name: Configuration de Pages
+        uses: actions/configure-pages@v5
+
+      - name: Téléversement du site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+      - name: Déploiement
+        id: deploiement
+        uses: actions/deploy-pages@v4
