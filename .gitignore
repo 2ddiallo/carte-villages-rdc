@@ -1,0 +1,12 @@
+__pycache__/
+.DS_Store
+*_rejets.csv
+
+# Exports bruts du partenaire : ils restent en local. Le dépôt est public et
+# redistribuer le fichier source engage plus que la carte qui en découle.
+# La couche publiée (data/villages.geojson) en est dérivée via
+# scripts/convertir_villages.py.
+data_source/
+
+# Configuration locale de l'éditeur / du serveur de test
+.claude/

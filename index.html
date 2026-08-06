@@ -1,0 +1,1095 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Carte des villages — RDC (Est)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.min.css" />
+<style>
+  html, body { margin:0; padding:0; height:100%; font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+  #map { position:absolute; top:0; bottom:0; left:0; right:0; }
+
+  .ui-topleft {
+    position:absolute; top:12px; left:12px; z-index:1000;
+    display:flex; flex-direction:column; gap:10px; width:300px; max-width:calc(100vw - 24px);
+    /* S'arrête au-dessus de la légende (~150 px en bas à gauche) au lieu de
+       la recouvrir quand la liste de résultats est longue. */
+    max-height:calc(100vh - 175px); overflow-y:auto; padding-right:2px;
+  }
+  .panel {
+    background:#ffffffee; backdrop-filter:blur(4px);
+    border-radius:10px; padding:12px 14px; box-shadow:0 2px 10px rgba(0,0,0,0.15);
+  }
+  .panel h1 { font-size:14px; margin:0 0 6px 0; color:#1a3a5c; }
+  .panel p { font-size:12px; margin:0; color:#444; line-height:1.4; }
+
+  /* ---- Blocs de filtres repliables ---- */
+  .bloc { border-top:1px solid #e3eaf1; margin-top:10px; padding-top:9px; }
+  .bloc:first-of-type { border-top:none; margin-top:8px; padding-top:0; }
+  .bloc > summary {
+    font-size:11px; font-weight:700; color:#1a3a5c; text-transform:uppercase;
+    letter-spacing:.04em; cursor:pointer; list-style:none; user-select:none;
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  .bloc > summary::-webkit-details-marker { display:none; }
+  .bloc > summary::after { content:"▾"; font-size:10px; color:#8fa5b8; transition:transform .15s; }
+  .bloc[open] > summary::after { transform:rotate(180deg); }
+  .bloc-corps { padding-top:8px; }
+
+  .ligne-case { display:flex; align-items:center; gap:7px; font-size:12px; color:#333; margin:5px 0; }
+  .ligne-case input { margin:0; flex:none; accent-color:#1a3a5c; cursor:pointer; }
+  .ligne-case label { cursor:pointer; flex:1; display:flex; justify-content:space-between; gap:6px; }
+  .ligne-case .compte { color:#8fa5b8; font-variant-numeric:tabular-nums; font-size:11px; }
+  .pastille { width:9px; height:9px; border-radius:50%; flex:none; border:1.5px solid #fff; box-shadow:0 0 0 1px #0003; }
+
+  select.filtre {
+    width:100%; border:1px solid #ccd6e0; border-radius:6px; background:#fff;
+    padding:5px 7px; font-size:12px; color:#333; margin-top:2px;
+  }
+  select.filtre:focus { outline:none; border-color:#1a3a5c; box-shadow:0 0 0 2px #1a3a5c33; }
+  .etiquette-filtre { font-size:11px; color:#8fa5b8; margin:7px 0 0; }
+
+  .btn-reinit {
+    width:100%; margin-top:10px; border:1px solid #ccd6e0; background:#f6f9fc;
+    color:#1a3a5c; border-radius:6px; padding:6px; font-size:11.5px;
+    font-weight:600; cursor:pointer;
+  }
+  .btn-reinit:hover { background:#eaf1f8; }
+
+  /* ---- Recherche ---- */
+  .search-box {
+    background:#ffffffee; backdrop-filter:blur(4px);
+    border-radius:10px; padding:8px; box-shadow:0 2px 10px rgba(0,0,0,0.15);
+  }
+  .search-box form { display:flex; gap:6px; }
+  .search-box input {
+    flex:1; min-width:0; border:1px solid #ccd6e0; border-radius:6px;
+    padding:6px 8px; font-size:12px; color:#333;
+  }
+  .search-box input:focus { outline:none; border-color:#1a3a5c; box-shadow:0 0 0 2px #1a3a5c33; }
+  .search-box button {
+    border:none; background:#1a3a5c; color:#fff; border-radius:6px;
+    padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer;
+  }
+  .search-box button:hover { background:#25507c; }
+  .search-box .btn-effacer {
+    background:#eef3f8; color:#1a3a5c; padding:6px 9px; font-size:13px; line-height:1;
+  }
+  .search-box .btn-effacer:hover { background:#dde7f0; }
+  .search-erreur { font-size:11px; color:#b3261e; margin:6px 2px 0; line-height:1.4; }
+  .search-aide { font-size:10.5px; color:#8fa5b8; margin:6px 2px 0; line-height:1.35; }
+
+  .resultats { margin:6px 0 0; max-height:200px; overflow-y:auto; }
+  .resultat {
+    padding:5px 7px; font-size:12px; color:#333; border-radius:5px; cursor:pointer;
+    display:flex; align-items:baseline; gap:6px;
+  }
+  .resultat:hover { background:#eef3f8; }
+  .resultat .nom { font-weight:600; color:#1a3a5c; }
+  .resultat .contexte { font-size:10.5px; color:#8fa5b8; margin-left:auto; white-space:nowrap; }
+  .resultat.zone .nom { color:#0f6b4f; }
+  .resultat .niveau {
+    font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:.03em;
+    color:#0f6b4f; background:#e4f3ec; border-radius:3px; padding:1px 4px; flex:none;
+  }
+  .resultats-info { font-size:10.5px; color:#8fa5b8; padding:4px 7px; }
+  .resultats-separateur {
+    font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:.04em;
+    color:#8fa5b8; padding:6px 7px 2px; border-top:1px solid #eef3f8; margin-top:3px;
+  }
+  .resultats-separateur:first-child { border-top:none; margin-top:0; }
+
+  .basemap-switch {
+    position:absolute; top:12px; right:12px; z-index:1000;
+    background:#fff; border-radius:10px; box-shadow:0 2px 10px rgba(0,0,0,0.15);
+    overflow:hidden; display:flex;
+  }
+  .basemap-switch button {
+    border:none; background:#fff; padding:8px 14px; font-size:12px;
+    cursor:pointer; color:#1a3a5c; font-weight:600;
+  }
+  .basemap-switch button.active { background:#1a3a5c; color:#fff; }
+  .basemap-switch button:hover:not(.active) { background:#eef3f8; }
+
+  .legend {
+    position:absolute; bottom:20px; left:12px; z-index:1000;
+    background:#ffffffee; border-radius:10px; padding:10px 14px;
+    box-shadow:0 2px 10px rgba(0,0,0,0.15); font-size:12px; color:#333;
+    line-height:1.9;
+  }
+  .legend-dot {
+    display:inline-block; width:10px; height:10px; border-radius:50%;
+    margin-right:6px; border:1.5px solid #fff;
+  }
+  .legend-cluster {
+    display:inline-block; width:14px; height:14px; border-radius:50%;
+    background:#1a3a5c; margin-right:6px; vertical-align:-2px;
+  }
+  .legend-ligne {
+    display:inline-block; width:16px; height:0;
+    border-top:2px solid #8fa5b8; margin:0 6px 4px 0; vertical-align:middle;
+  }
+  .legend-ligne.tiret { border-top-style:dashed; }
+  .legend-ligne.pointille { border-top-style:dotted; border-top-width:2px; border-color:#0f6b4f; }
+
+  /* Étiquettes : Leaflet écrit opacity:0.9 en style inline sur chaque tooltip
+     permanent (Tooltip.onAdd). Sans !important, les règles ci-dessous sont
+     ignorées et les noms restent visibles à tous les zooms. */
+  /* Étiquettes de noms de villages (visibles à partir d'un certain zoom) */
+  .village-label {
+    background:none; border:none; box-shadow:none; padding:0; margin:0;
+    color:#fff; font-size:11px; font-weight:600; white-space:nowrap;
+    text-shadow:0 0 3px #000, 0 0 3px #000, 0 0 3px #000;
+    pointer-events:none; opacity:0 !important; transition:opacity .12s;
+  }
+  .village-label::before { display:none !important; }
+  .montrer-labels .village-label { opacity:1 !important; }
+
+  /* Étiquettes de noms de provinces (visibles au niveau national/régional) */
+  .province-label {
+    background:none; border:none; box-shadow:none; padding:0; margin:0;
+    color:#fff; font-size:13px; font-weight:700; letter-spacing:.03em;
+    text-transform:uppercase; white-space:nowrap;
+    text-shadow:0 0 4px #000, 0 0 4px #000, 0 1px 2px #000;
+    pointer-events:none; opacity:0 !important; transition:opacity .12s;
+  }
+  .province-label::before { display:none !important; }
+  .montrer-provinces .province-label { opacity:1 !important; }
+
+  /* Étiquettes de zones de santé (découpage sanitaire, pas administratif) */
+  .zone-sante-label {
+    background:none; border:none; box-shadow:none; padding:0; margin:0;
+    color:#a7f3d0; font-size:10.5px; font-weight:600; letter-spacing:.02em;
+    white-space:nowrap; text-shadow:0 0 4px #000, 0 0 4px #000;
+    pointer-events:none; opacity:0 !important; transition:opacity .12s;
+  }
+  .zone-sante-label::before { display:none !important; }
+  .montrer-zones-sante .zone-sante-label { opacity:1 !important; }
+
+  /* Étiquettes de territoires (niveau intermédiaire) */
+  .territoire-label {
+    background:none; border:none; box-shadow:none; padding:0; margin:0;
+    color:#fff; font-size:11px; font-weight:600; letter-spacing:.02em;
+    white-space:nowrap; text-shadow:0 0 4px #000, 0 0 4px #000;
+    pointer-events:none; opacity:0 !important; transition:opacity .12s;
+  }
+  .territoire-label::before { display:none !important; }
+  .montrer-territoires .territoire-label { opacity:1 !important; }
+
+  .popup-title { font-weight:700; font-size:14px; color:#1a3a5c; margin-bottom:2px; }
+  .popup-source {
+    font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.04em;
+    margin-bottom:6px;
+  }
+  .popup-row { font-size:12px; color:#333; margin:2px 0; }
+  .popup-label { color:#888; }
+
+  .count-badge {
+    position:absolute; bottom:20px; right:12px; z-index:1000;
+    background:#1a3a5c; color:#fff; border-radius:20px; padding:6px 14px;
+    font-size:12px; font-weight:600; box-shadow:0 2px 10px rgba(0,0,0,0.15);
+  }
+
+  /* Icônes de cluster, assorties au thème de la carte */
+  .cluster-icon {
+    background:#1a3a5cd9; color:#fff; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-weight:600; border:2px solid #fff;
+    box-shadow:0 1px 6px rgba(0,0,0,0.35);
+  }
+  .cluster-petit  { font-size:11px; }
+  .cluster-moyen  { font-size:12px; }
+  .cluster-grand  { font-size:13px; }
+
+  .erreur-chargement {
+    position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+    z-index:2000; background:#fff; border-radius:10px; padding:18px 22px;
+    box-shadow:0 2px 16px rgba(0,0,0,0.25); max-width:420px;
+    font-size:13px; color:#333; line-height:1.5;
+  }
+  .erreur-chargement code { background:#eef3f8; padding:1px 5px; border-radius:4px; font-size:12px; }
+</style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<div class="ui-topleft">
+  <div class="panel">
+    <h1>Carte des villages — RDC (Est)</h1>
+    <p>Clique sur un groupe pour zoomer, puis sur un point pour voir les détails.</p>
+
+    <details class="bloc" open>
+      <summary>Couches</summary>
+      <div class="bloc-corps" id="bloc-couches"></div>
+    </details>
+
+    <details class="bloc" open>
+      <summary>Provinces</summary>
+      <div class="bloc-corps" id="bloc-provinces"></div>
+    </details>
+
+    <details class="bloc">
+      <summary>Filtres</summary>
+      <div class="bloc-corps">
+        <p class="etiquette-filtre">Territoire</p>
+        <select class="filtre" id="filtre-territoire"><option value="">Tous</option></select>
+
+        <p class="etiquette-filtre">Zone de santé <span style="text-transform:none">(GRID3)</span></p>
+        <select class="filtre" id="filtre-zonesante"><option value="">Toutes</option></select>
+
+        <p class="etiquette-filtre">Type de localité <span style="text-transform:none">(GRID3)</span></p>
+        <select class="filtre" id="filtre-type"><option value="">Tous</option></select>
+
+        <button class="btn-reinit" id="btn-reinit">Réinitialiser les filtres</button>
+      </div>
+    </details>
+
+    <details class="bloc">
+      <summary>Habillage</summary>
+      <div class="bloc-corps">
+        <div class="ligne-case">
+          <input type="checkbox" id="case-territoires" checked>
+          <label for="case-territoires">Limites de territoires</label>
+        </div>
+        <div class="ligne-case">
+          <input type="checkbox" id="case-zones-sante" checked>
+          <label for="case-zones-sante">Limites de zones de santé</label>
+        </div>
+        <div class="ligne-case">
+          <input type="checkbox" id="case-noms" checked>
+          <label for="case-noms">Noms des villages au zoom</label>
+        </div>
+      </div>
+    </details>
+  </div>
+
+  <div class="search-box">
+    <form id="form-recherche" novalidate>
+      <input id="champ-recherche" type="text" placeholder="Village, zone de santé, ou lat, lon"
+             autocomplete="off" spellcheck="false" aria-label="Recherche">
+      <button type="submit">Valider</button>
+      <button type="button" class="btn-effacer" id="btn-effacer" title="Effacer" hidden>&times;</button>
+    </form>
+    <div class="search-erreur" id="erreur-recherche" hidden></div>
+    <div class="resultats" id="resultats" hidden></div>
+    <div class="search-aide">
+      Village, territoire, zone ou aire de santé — ou des coordonnées
+      « latitude, longitude ». Les villes (Bunia, Goma…) se trouvent par leur
+      zone de santé : le référentiel s'arrête au niveau du quartier.
+    </div>
+  </div>
+</div>
+
+<div class="basemap-switch">
+  <button id="btn-standard">Standard</button>
+  <button id="btn-satellite" class="active">Satellite</button>
+</div>
+
+<div class="legend" id="legende"></div>
+<div class="count-badge" id="count-badge">Chargement…</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js"></script>
+<script>
+// =========================================================================
+// CONFIGURATION
+//
+// Deux couches indépendantes, jamais fusionnées : le référentiel ouvert
+// GRID3 et l'export opérationnel CHDC. Chacune garde ses propres champs,
+// sa couleur et sa source. Pour ajouter un champ au popup, ajouter une
+// entrée { champ, libelle } dans "champsPopup" de la couche concernée.
+//
+// "champ"   : nom exact de la propriété dans le GeoJSON
+// "libelle" : texte affiché dans le popup
+// "suffixe" : texte ajouté après la valeur (facultatif)
+// Les champs absents ou vides sont ignorés.
+// =========================================================================
+const CONFIG = {
+  provinces: [
+    { nom: "Ituri",      fichier: "data/grid3_ituri.geojson" },
+    { nom: "Nord-Kivu",  fichier: "data/grid3_nord-kivu.geojson" },
+    { nom: "Sud-Kivu",   fichier: "data/grid3_sud-kivu.geojson" },
+    { nom: "Tanganyika", fichier: "data/grid3_tanganyika.geojson" },
+  ],
+  couches: {
+    grid3: {
+      libelle: "Référentiel GRID3",
+      couleur: "#e0631f",
+      champTitre: "localite",
+      champProvince: "province",
+      champTerritoire: "territoire",
+      source: "GRID3 v8.0",
+      champsPopup: [
+        { champ: "localitetype",   libelle: "Type" },
+        { champ: "localite_alt",   libelle: "Autre nom" },
+        { champ: "territoire",     libelle: "Territoire" },
+        { champ: "province",       libelle: "Province" },
+        { champ: "zonesante",      libelle: "Zone de santé" },
+        { champ: "airesante",      libelle: "Aire de santé" },
+        { champ: "enclav",         libelle: "Enclavement" },
+        { champ: "source_acronym", libelle: "Relevé par" },
+        { champ: "date",           libelle: "Année du relevé" },
+        { champ: "precision_",     libelle: "Précision GPS", suffixe: " m" },
+      ],
+    },
+    chdc: {
+      libelle: "Données CHDC",
+      couleur: "#2196f3",
+      fichier: "data/villages.geojson",
+      champTitre: "Village",
+      champProvince: "Province",
+      champTerritoire: "Territory",
+      source: "Export CHDC",
+      champsPopup: [
+        { champ: "Territory", libelle: "Territoire" },
+        { champ: "Province",  libelle: "Province" },
+        { champ: "Quartier",  libelle: "Quartier" },
+        { champ: "Quartier1", libelle: "Quartier (2)" },
+      ],
+    },
+  },
+  afficherCoordonnees: true,
+  // Zoom appliqué lorsqu'on clique sur un village. 18 = très rapproché ; en
+  // zone rurale l'imagerie satellite réelle s'arrête vers 17, donc au-delà
+  // elle est agrandie (un peu plus douce). Mettre 19 pour le zoom maximal.
+  zoomClicVillage: 18,
+  maxResultatsRecherche: 25,
+};
+
+// ---------- Initialisation carte ----------
+const map = L.map("map", { zoomControl: false, preferCanvas: true }).setView([-2.0, 28.5], 6);
+L.control.zoom({ position: "bottomright" }).addTo(map);
+
+const standardLayer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  attribution: "&copy; OpenStreetMap contributors",
+  maxZoom: 19,
+});
+
+const satelliteLayer = L.tileLayer(
+  "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+  {
+    attribution: "Tiles &copy; Esri &mdash; Esri, Maxar, Earthstar Geographics",
+    maxZoom: 19,
+    // L'imagerie Esri réelle s'arrête vers z17 en zones rurales de RDC (au-delà,
+    // le service renvoie une tuile « Map data not yet available »). On plafonne
+    // donc le niveau natif à 17 : Leaflet agrandit ces tuiles au lieu d'afficher
+    // le placeholder. NB : la variante « Clarity » ne couvre pas mieux le rural
+    // (elle renvoie une erreur 404 à z18+ hors des villes) — testée, écartée.
+    maxNativeZoom: 17,
+  }
+);
+
+satelliteLayer.addTo(map);
+
+// Attribution obligatoire des jeux de données (licences CC BY 4.0 et CC BY-IGO).
+map.attributionControl.addAttribution(
+  'Localités : <a href="https://grid3.org/">GRID3</a> (CC BY 4.0) — ' +
+  'Limites : <a href="https://data.humdata.org/dataset/cod-ab-cod">OCHA COD-AB</a> (CC BY-IGO)'
+);
+
+// ---------- État de l'application ----------
+const etat = {
+  // province → tableau de features GRID3 (chargé à la demande)
+  grid3: new Map(),
+  // toutes les features CHDC, filtrées ensuite par province
+  chdc: null,
+  provincesActives: new Set(CONFIG.provinces.map((p) => p.nom)),
+  couchesActives: new Set(["grid3"]),
+  territoire: "",
+  zoneSante: "",
+  type: "",
+  chargements: new Map(), // province → Promise, évite les téléchargements en double
+};
+
+// ---------- Calques d'habillage (sous les points, non cliquables) ----------
+map.createPane("provinces");
+map.getPane("provinces").style.zIndex = 350;
+map.createPane("territoires");
+map.getPane("territoires").style.zIndex = 351;
+map.createPane("zones-sante");
+map.getPane("zones-sante").style.zIndex = 352;
+
+// Couches d'habillage. Les limites administratives (province, territoire)
+// reprennent la couleur du fond ; les zones de santé, qui relèvent d'un autre
+// découpage, sont en vert pour qu'on ne les confonde pas avec elles.
+const HABILLAGE = {
+  provinces: {
+    url: "data/provinces.geojson", pane: "provinces", classeEtiquette: "province-label",
+    style: {
+      satellite: { color: "#ffffff", weight: 1.5, opacity: 0.75, fill: false },
+      standard:  { color: "#1a3a5c", weight: 1.5, opacity: 0.45, fill: false },
+    },
+  },
+  territoires: {
+    url: "data/territoires.geojson", pane: "territoires", classeEtiquette: "territoire-label",
+    style: {
+      satellite: { color: "#ffffff", weight: 1, opacity: 0.5, fill: false, dashArray: "4,4" },
+      standard:  { color: "#1a3a5c", weight: 1, opacity: 0.3, fill: false, dashArray: "4,4" },
+    },
+  },
+  zonesSante: {
+    url: "data/zones_sante.geojson", pane: "zones-sante", classeEtiquette: "zone-sante-label",
+    style: {
+      satellite: { color: "#6ee7b7", weight: 1.2, opacity: 0.85, fill: false, dashArray: "2,3" },
+      standard:  { color: "#0f6b4f", weight: 1.2, opacity: 0.6, fill: false, dashArray: "2,3" },
+    },
+  },
+};
+
+let fondActuel = "satellite";
+// Pour chaque clé de HABILLAGE : la couche Leaflet et ses étiquettes.
+const habillage = {};
+for (const cle of Object.keys(HABILLAGE)) habillage[cle] = { couche: null, etiquettes: [] };
+
+function chargerLimites(cle) {
+  const config = HABILLAGE[cle];
+  return fetch(config.url, { cache: "no-cache" })
+    .then((rep) => { if (!rep.ok) throw new Error(`HTTP ${rep.status}`); return rep.json(); })
+    .then((geojson) => {
+      const couche = L.geoJSON(geojson, {
+        pane: config.pane,
+        interactive: false,
+        style: config.style[fondActuel],
+      }).addTo(map);
+      couche.eachLayer((l) => {
+        const nom = l.feature && l.feature.properties && l.feature.properties.nom;
+        if (!nom) return;
+        habillage[cle].etiquettes.push(
+          L.tooltip({
+            permanent: true, direction: "center",
+            className: config.classeEtiquette, interactive: false,
+          }).setLatLng(l.getBounds().getCenter()).setContent(String(nom)).addTo(map)
+        );
+      });
+      habillage[cle].couche = couche;
+      majLabels();
+    })
+    .catch((err) => console.warn(`Limites (${cle}) non chargées :`, err.message));
+}
+
+for (const cle of Object.keys(HABILLAGE)) chargerLimites(cle);
+
+// Affiche ou masque une couche d'habillage, étiquettes comprises.
+function basculerHabillage(cle, actif) {
+  const { couche, etiquettes } = habillage[cle];
+  if (!couche) return;
+  if (actif) couche.addTo(map); else map.removeLayer(couche);
+  for (const etiquette of etiquettes) {
+    if (actif) etiquette.addTo(map); else map.removeLayer(etiquette);
+  }
+}
+
+function changerFond(nom) {
+  fondActuel = nom;
+  if (nom === "standard") { map.removeLayer(satelliteLayer); standardLayer.addTo(map); }
+  else                    { map.removeLayer(standardLayer); satelliteLayer.addTo(map); }
+  document.getElementById("btn-standard").classList.toggle("active", nom === "standard");
+  document.getElementById("btn-satellite").classList.toggle("active", nom === "satellite");
+  for (const [cle, config] of Object.entries(HABILLAGE)) {
+    if (habillage[cle].couche) habillage[cle].couche.setStyle(config.style[nom]);
+  }
+}
+
+document.getElementById("btn-standard").addEventListener("click", () => changerFond("standard"));
+document.getElementById("btn-satellite").addEventListener("click", () => changerFond("satellite"));
+
+// ---------- Popups ----------
+function echapper(valeur) {
+  return String(valeur)
+    .replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;").replaceAll("'", "&#39;");
+}
+
+function contenuPopup(feature, cleCouche) {
+  const couche = CONFIG.couches[cleCouche];
+  const p = feature.properties || {};
+  const titre = p[couche.champTitre] ?? "(sans nom)";
+  let html = `<div class="popup-title">${echapper(titre)}</div>`;
+  html += `<div class="popup-source" style="color:${couche.couleur}">${echapper(couche.source)}</div>`;
+  for (const { champ, libelle, suffixe } of couche.champsPopup) {
+    const valeur = p[champ];
+    if (valeur === null || valeur === undefined || valeur === "") continue;
+    html += `<div class="popup-row"><span class="popup-label">${echapper(libelle)} :</span> ` +
+            `${echapper(valeur)}${suffixe ? echapper(suffixe) : ""}</div>`;
+  }
+  if (CONFIG.afficherCoordonnees) {
+    const [lon, lat] = feature.geometry.coordinates;
+    html += `<div class="popup-row"><span class="popup-label">Coordonnées :</span> ` +
+            `${lat.toFixed(4)}, ${lon.toFixed(4)}</div>`;
+  }
+  return html;
+}
+
+// ---------- Clustering + points ----------
+const clusters = L.markerClusterGroup({
+  chunkedLoading: true,           // insertion progressive : l'interface reste fluide
+  maxClusterRadius: 60,
+  disableClusteringAtZoom: 12,    // au-delà, tous les points individuels sont affichés
+  spiderfyOnMaxZoom: false,
+  iconCreateFunction: (cluster) => {
+    const n = cluster.getChildCount();
+    let taille = 32, classe = "cluster-petit";
+    if (n >= 1000)     { taille = 46; classe = "cluster-grand"; }
+    else if (n >= 100) { taille = 38; classe = "cluster-moyen"; }
+    const texte = n >= 1000 ? (n / 1000).toFixed(1).replace(".", ",") + " k" : n;
+    return L.divIcon({
+      html: `<div class="cluster-icon ${classe}" style="width:${taille}px;height:${taille}px;">${texte}</div>`,
+      className: "",
+      iconSize: [taille, taille],
+    });
+  },
+});
+map.addLayer(clusters);
+
+// Le marqueur d'une feature est créé une seule fois puis réutilisé : filtrer
+// ne recrée pas 25 000 objets à chaque changement de case à cocher.
+function marqueur(feature, cleCouche) {
+  if (feature._marqueur) return feature._marqueur;
+
+  const couche = CONFIG.couches[cleCouche];
+  const [lon, lat] = feature.geometry.coordinates;
+  const m = L.circleMarker([lat, lon], {
+    radius: 6,
+    fillColor: couche.couleur,
+    color: "#ffffff",
+    weight: 1.5,
+    opacity: 1,
+    fillOpacity: 0.9,
+  });
+  m.bindPopup(() => contenuPopup(feature, cleCouche));
+  // Clic sur un village : zoom rapproché directement sur ce point.
+  m.on("click", () => map.setView(m.getLatLng(), CONFIG.zoomClicVillage));
+  const nom = feature.properties && feature.properties[couche.champTitre];
+  if (nom) {
+    m.bindTooltip(String(nom), {
+      permanent: true, direction: "right", offset: [6, 0], className: "village-label",
+    });
+  }
+  feature._marqueur = m;
+  feature._couche = cleCouche;
+  return m;
+}
+
+// ---------- Filtrage ----------
+function passeFiltres(feature, cleCouche) {
+  const couche = CONFIG.couches[cleCouche];
+  const p = feature.properties || {};
+
+  if (!etat.provincesActives.has(p[couche.champProvince])) return false;
+  if (etat.territoire && p[couche.champTerritoire] !== etat.territoire) return false;
+  // Zone de santé et type n'existent que dans GRID3 : quand ils sont
+  // renseignés, la couche CHDC est masquée plutôt que filtrée à tort.
+  if (etat.zoneSante) {
+    if (cleCouche !== "grid3") return false;
+    if (p.zonesante !== etat.zoneSante) return false;
+  }
+  if (etat.type) {
+    if (cleCouche !== "grid3") return false;
+    if (p.localitetype !== etat.type) return false;
+  }
+  return true;
+}
+
+function featuresVisibles() {
+  const resultat = [];
+  if (etat.couchesActives.has("grid3")) {
+    for (const province of etat.provincesActives) {
+      const features = etat.grid3.get(province);
+      if (!features) continue;
+      for (const f of features) if (passeFiltres(f, "grid3")) resultat.push([f, "grid3"]);
+    }
+  }
+  if (etat.couchesActives.has("chdc") && etat.chdc) {
+    for (const f of etat.chdc) if (passeFiltres(f, "chdc")) resultat.push([f, "chdc"]);
+  }
+  return resultat;
+}
+
+let rafraichissementEnCours = null;
+function rafraichirCarte() {
+  // Regroupe les appels successifs (plusieurs cases cochées d'affilée).
+  if (rafraichissementEnCours) clearTimeout(rafraichissementEnCours);
+  rafraichissementEnCours = setTimeout(() => {
+    const visibles = featuresVisibles();
+    clusters.clearLayers();
+    clusters.addLayers(visibles.map(([f, c]) => marqueur(f, c)));
+    majBadge(visibles.length);
+    majLabels();
+  }, 30);
+}
+
+function majBadge(nombre) {
+  const badge = document.getElementById("count-badge");
+  const enCours = CONFIG.provinces.filter(
+    (p) => etat.provincesActives.has(p.nom) && !etat.grid3.has(p.nom)
+  ).length;
+  if (enCours && etat.couchesActives.has("grid3")) {
+    badge.textContent = `Chargement… (${nombre.toLocaleString("fr-FR")})`;
+  } else {
+    badge.textContent = nombre.toLocaleString("fr-FR") + " localités affichées";
+  }
+}
+
+// ---------- Chargement des données ----------
+function chargerProvince(nom) {
+  if (etat.chargements.has(nom)) return etat.chargements.get(nom);
+  const province = CONFIG.provinces.find((p) => p.nom === nom);
+  const promesse = fetch(province.fichier, { cache: "no-cache" })
+    .then((rep) => { if (!rep.ok) throw new Error(`HTTP ${rep.status}`); return rep.json(); })
+    .then((geojson) => {
+      etat.grid3.set(nom, geojson.features);
+      majListesFiltres();
+      rafraichirCarte();
+    })
+    .catch((err) => {
+      etat.chargements.delete(nom);
+      signalerErreurChargement(province.fichier, err);
+    });
+  etat.chargements.set(nom, promesse);
+  return promesse;
+}
+
+function chargerCHDC() {
+  if (etat.chargements.has("chdc")) return etat.chargements.get("chdc");
+  const promesse = fetch(CONFIG.couches.chdc.fichier, { cache: "no-cache" })
+    .then((rep) => { if (!rep.ok) throw new Error(`HTTP ${rep.status}`); return rep.json(); })
+    .then((geojson) => {
+      etat.chdc = geojson.features;
+      majListesFiltres();
+      rafraichirCarte();
+    })
+    .catch((err) => {
+      etat.chargements.delete("chdc");
+      console.warn("Couche CHDC non chargée :", err.message);
+      const ligne = document.querySelector('[data-couche="chdc"]');
+      if (ligne) {
+        ligne.querySelector("input").checked = false;
+        ligne.querySelector("input").disabled = true;
+        ligne.querySelector(".compte").textContent = "indisponible";
+      }
+      etat.couchesActives.delete("chdc");
+    });
+  etat.chargements.set("chdc", promesse);
+  return promesse;
+}
+
+function signalerErreurChargement(url, err) {
+  if (document.querySelector(".erreur-chargement")) return;
+  const div = document.createElement("div");
+  div.className = "erreur-chargement";
+  if (window.location.protocol === "file:") {
+    div.innerHTML =
+      "<b>Les données n'ont pas pu être chargées.</b><br>" +
+      "Ouverte directement depuis le disque, la page ne peut pas lire les fichiers GeoJSON. " +
+      "Lance un petit serveur local depuis le dossier du projet :<br><br>" +
+      "<code>python3 -m http.server 8000</code><br><br>" +
+      "puis ouvre <code>http://localhost:8000</code>. " +
+      "(En ligne — GitHub Pages, Netlify — le problème ne se pose pas.)";
+  } else {
+    div.innerHTML =
+      "<b>Les données n'ont pas pu être chargées.</b><br>" +
+      `Vérifie que <code>${echapper(url)}</code> existe bien. Détail : ${echapper(err.message)}`;
+  }
+  document.body.appendChild(div);
+}
+
+// ---------- Panneaux de contrôle ----------
+function construireControles() {
+  const blocCouches = document.getElementById("bloc-couches");
+  for (const [cle, couche] of Object.entries(CONFIG.couches)) {
+    const ligne = document.createElement("div");
+    ligne.className = "ligne-case";
+    ligne.dataset.couche = cle;
+    ligne.innerHTML =
+      `<input type="checkbox" id="couche-${cle}"${etat.couchesActives.has(cle) ? " checked" : ""}>` +
+      `<span class="pastille" style="background:${couche.couleur}"></span>` +
+      `<label for="couche-${cle}">${echapper(couche.libelle)}<span class="compte"></span></label>`;
+    ligne.querySelector("input").addEventListener("change", (evt) => {
+      if (evt.target.checked) {
+        etat.couchesActives.add(cle);
+        if (cle === "chdc") chargerCHDC();
+        else for (const nom of etat.provincesActives) chargerProvince(nom);
+      } else {
+        etat.couchesActives.delete(cle);
+      }
+      rafraichirCarte();
+    });
+    blocCouches.appendChild(ligne);
+  }
+
+  const blocProvinces = document.getElementById("bloc-provinces");
+  for (const province of CONFIG.provinces) {
+    const ligne = document.createElement("div");
+    ligne.className = "ligne-case";
+    ligne.dataset.province = province.nom;
+    ligne.innerHTML =
+      `<input type="checkbox" id="prov-${echapper(province.nom)}" checked>` +
+      `<label for="prov-${echapper(province.nom)}">${echapper(province.nom)}` +
+      `<span class="compte"></span></label>`;
+    ligne.querySelector("input").addEventListener("change", (evt) => {
+      if (evt.target.checked) {
+        etat.provincesActives.add(province.nom);
+        if (etat.couchesActives.has("grid3")) chargerProvince(province.nom);
+      } else {
+        etat.provincesActives.delete(province.nom);
+      }
+      majListesFiltres();
+      rafraichirCarte();
+    });
+    blocProvinces.appendChild(ligne);
+  }
+
+  document.getElementById("filtre-territoire").addEventListener("change", (evt) => {
+    etat.territoire = evt.target.value;
+    rafraichirCarte();
+  });
+  document.getElementById("filtre-zonesante").addEventListener("change", (evt) => {
+    etat.zoneSante = evt.target.value;
+    rafraichirCarte();
+  });
+  document.getElementById("filtre-type").addEventListener("change", (evt) => {
+    etat.type = evt.target.value;
+    rafraichirCarte();
+  });
+  document.getElementById("btn-reinit").addEventListener("click", () => {
+    etat.territoire = etat.zoneSante = etat.type = "";
+    document.getElementById("filtre-territoire").value = "";
+    document.getElementById("filtre-zonesante").value = "";
+    document.getElementById("filtre-type").value = "";
+    rafraichirCarte();
+  });
+
+  const casesHabillage = { "case-territoires": "territoires", "case-zones-sante": "zonesSante" };
+  for (const [id, cle] of Object.entries(casesHabillage)) {
+    document.getElementById(id).addEventListener("change", (evt) => {
+      basculerHabillage(cle, evt.target.checked);
+      majLabels();
+    });
+  }
+  document.getElementById("case-noms").addEventListener("change", majLabels);
+
+  construireLegende();
+}
+
+// Les listes déroulantes ne proposent que des valeurs réellement présentes
+// dans les provinces cochées : pas de choix qui ne donne aucun résultat.
+function majListesFiltres() {
+  const territoires = new Set();
+  const zones = new Set();
+  const types = new Set();
+
+  for (const province of etat.provincesActives) {
+    for (const f of etat.grid3.get(province) || []) {
+      const p = f.properties;
+      if (p.territoire) territoires.add(p.territoire);
+      if (p.zonesante) zones.add(p.zonesante);
+      if (p.localitetype) types.add(p.localitetype);
+    }
+  }
+  for (const f of etat.chdc || []) {
+    const p = f.properties;
+    if (etat.provincesActives.has(p.Province) && p.Territory) territoires.add(p.Territory);
+  }
+
+  remplirSelect("filtre-territoire", territoires, etat.territoire, "Tous");
+  remplirSelect("filtre-zonesante", zones, etat.zoneSante, "Toutes");
+  remplirSelect("filtre-type", types, etat.type, "Tous");
+  majComptes();
+}
+
+function remplirSelect(id, valeurs, selection, libelleVide) {
+  const select = document.getElementById(id);
+  const triees = [...valeurs].sort((a, b) => a.localeCompare(b, "fr"));
+  select.innerHTML = `<option value="">${libelleVide}</option>` +
+    triees.map((v) => `<option value="${echapper(v)}"${v === selection ? " selected" : ""}>` +
+                      `${echapper(v)}</option>`).join("");
+  // La sélection courante peut avoir disparu (province décochée) : on la relâche.
+  if (selection && !valeurs.has(selection)) {
+    select.value = "";
+    if (id === "filtre-territoire") etat.territoire = "";
+    if (id === "filtre-zonesante") etat.zoneSante = "";
+    if (id === "filtre-type") etat.type = "";
+  }
+}
+
+function majComptes() {
+  for (const province of CONFIG.provinces) {
+    const ligne = document.querySelector(`[data-province="${province.nom}"] .compte`);
+    if (!ligne) continue;
+    const features = etat.grid3.get(province.nom);
+    ligne.textContent = features ? features.length.toLocaleString("fr-FR") : "";
+  }
+  const compteGrid3 = document.querySelector('[data-couche="grid3"] .compte');
+  if (compteGrid3) {
+    let total = 0;
+    for (const province of etat.provincesActives) total += (etat.grid3.get(province) || []).length;
+    compteGrid3.textContent = total ? total.toLocaleString("fr-FR") : "";
+  }
+  const compteChdc = document.querySelector('[data-couche="chdc"] .compte');
+  if (compteChdc && etat.chdc && !compteChdc.textContent.includes("indispo")) {
+    const total = etat.chdc.filter((f) => etat.provincesActives.has(f.properties.Province)).length;
+    compteChdc.textContent = total.toLocaleString("fr-FR");
+  }
+}
+
+function construireLegende() {
+  const legende = document.getElementById("legende");
+  let html = "";
+  for (const couche of Object.values(CONFIG.couches)) {
+    html += `<div><span class="legend-dot" style="background:${couche.couleur};` +
+            `box-shadow:0 0 0 1px ${couche.couleur}"></span>${echapper(couche.libelle)}</div>`;
+  }
+  html += `<div><span class="legend-cluster"></span>Groupe de localités</div>`;
+  html += `<div><span class="legend-ligne"></span>Province</div>`;
+  html += `<div><span class="legend-ligne tiret"></span>Territoire</div>`;
+  html += `<div><span class="legend-ligne pointille"></span>Zone de santé</div>`;
+  legende.innerHTML = html;
+}
+
+// ---------- Étiquettes ----------
+// Les noms n'apparaissent qu'à partir du zoom LABEL_ZOOM pour éviter la surcharge.
+const LABEL_ZOOM = 13;              // noms de villages : à partir de ce zoom
+const PROVINCE_LABEL_ZOOM_MAX = 7;      // noms de provinces : jusqu'à ce zoom
+const TERRITOIRE_LABEL_ZOOM = [8, 10];  // noms de territoires : entre ces zooms
+const ZONE_SANTE_LABEL_ZOOM = [11, 12]; // noms de zones de santé : entre ces zooms
+function majLabels() {
+  const z = map.getZoom();
+  const c = map.getContainer();
+  const nomsActifs = document.getElementById("case-noms").checked;
+  const territoiresActifs = document.getElementById("case-territoires").checked;
+  const zonesActives = document.getElementById("case-zones-sante").checked;
+  c.classList.toggle("montrer-labels", nomsActifs && z >= LABEL_ZOOM);
+  c.classList.toggle("montrer-provinces", z <= PROVINCE_LABEL_ZOOM_MAX);
+  c.classList.toggle("montrer-territoires",
+    territoiresActifs && z >= TERRITOIRE_LABEL_ZOOM[0] && z <= TERRITOIRE_LABEL_ZOOM[1]);
+  c.classList.toggle("montrer-zones-sante",
+    zonesActives && z >= ZONE_SANTE_LABEL_ZOOM[0] && z <= ZONE_SANTE_LABEL_ZOOM[1]);
+}
+map.on("zoomend", majLabels);
+
+// ---------- Recherche : nom de village ou coordonnées GPS ----------
+// Coordonnées acceptées : "-1.1833, 29.45", "-1.1833 29.45", "-1,1833 29,45",
+// "-1,1833; 29,45" (degrés décimaux, ordre latitude puis longitude).
+function parserCoordonnees(texte) {
+  texte = texte.trim();
+  // deux nombres à point décimal, séparés par virgule, point-virgule ou espace
+  let m = texte.match(/^(-?\d+(?:\.\d+)?)\s*[,;\s]\s*(-?\d+(?:\.\d+)?)$/);
+  // deux nombres à virgule décimale, séparés par point-virgule ou espace
+  if (!m) m = texte.match(/^(-?\d+(?:,\d+)?)\s*[;\s]\s*(-?\d+(?:,\d+)?)$/);
+  if (!m) return null;
+  return {
+    lat: parseFloat(m[1].replace(",", ".")),
+    lon: parseFloat(m[2].replace(",", ".")),
+  };
+}
+
+// Accents et casse ignorés : « Bunia » trouve « bunia », « Mahagi » « Mahagi 1 ».
+function normaliser(texte) {
+  return String(texte).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+}
+
+let repereRecherche = null;
+const btnEffacer = document.getElementById("btn-effacer");
+const divErreur = document.getElementById("erreur-recherche");
+const divResultats = document.getElementById("resultats");
+
+function retirerRepere() {
+  if (repereRecherche) { map.removeLayer(repereRecherche); repereRecherche = null; }
+  if (!divResultats.hidden) return;
+  btnEffacer.hidden = true;
+}
+
+function viderRecherche() {
+  retirerRepere();
+  divResultats.hidden = true;
+  divResultats.innerHTML = "";
+  divErreur.hidden = true;
+  btnEffacer.hidden = true;
+}
+
+function chercherParNom(texte) {
+  const requete = normaliser(texte);
+  const trouves = [];
+  for (const [feature, cleCouche] of featuresVisibles()) {
+    const couche = CONFIG.couches[cleCouche];
+    const nom = feature.properties[couche.champTitre];
+    if (!nom) continue;
+    const nomNormalise = normaliser(nom);
+    if (!nomNormalise.includes(requete)) continue;
+    trouves.push({
+      feature, cleCouche, nom,
+      // Les correspondances en début de nom remontent en tête.
+      score: nomNormalise.startsWith(requete) ? 0 : 1,
+      contexte: feature.properties[couche.champTerritoire] || feature.properties[couche.champProvince] || "",
+    });
+    if (trouves.length > 500) break;
+  }
+  trouves.sort((a, b) => a.score - b.score || a.nom.localeCompare(b.nom, "fr"));
+  return trouves;
+}
+
+// GRID3 s'arrête au niveau de la localité : une ville comme Bunia, Goma ou
+// Bukavu n'existe pas comme point, elle est éclatée en quartiers et avenues.
+// Chercher son nom ne renverrait donc rien. On cherche aussi parmi les
+// territoires, zones et aires de santé, et on cadre sur leur emprise.
+function chercherParRegroupement(texte) {
+  const requete = normaliser(texte);
+  const niveaux = [
+    { champ: "territoire", libelle: "Territoire" },
+    { champ: "zonesante", libelle: "Zone de santé" },
+    { champ: "airesante", libelle: "Aire de santé" },
+  ];
+  const groupes = new Map();
+
+  for (const [feature, cleCouche] of featuresVisibles()) {
+    if (cleCouche !== "grid3") continue;
+    const [lon, lat] = feature.geometry.coordinates;
+    for (const { champ, libelle } of niveaux) {
+      const valeur = feature.properties[champ];
+      if (!valeur) continue;
+      const valeurNormalisee = normaliser(valeur);
+      if (!valeurNormalisee.includes(requete)) continue;
+      const cle = `${champ}|${valeur}`;
+      let groupe = groupes.get(cle);
+      if (!groupe) {
+        groupe = {
+          nom: valeur, niveau: libelle, nombre: 0,
+          score: valeurNormalisee.startsWith(requete) ? 0 : 1,
+          bornes: [lat, lat, lon, lon],
+          contexte: feature.properties.province || "",
+        };
+        groupes.set(cle, groupe);
+      }
+      groupe.nombre += 1;
+      groupe.bornes[0] = Math.min(groupe.bornes[0], lat);
+      groupe.bornes[1] = Math.max(groupe.bornes[1], lat);
+      groupe.bornes[2] = Math.min(groupe.bornes[2], lon);
+      groupe.bornes[3] = Math.max(groupe.bornes[3], lon);
+    }
+  }
+
+  return [...groupes.values()]
+    .sort((a, b) => a.score - b.score || b.nombre - a.nombre)
+    .slice(0, 5);
+}
+
+function afficherResultats(villages, regroupements) {
+  if (!villages.length && !regroupements.length) {
+    divResultats.innerHTML =
+      `<div class="resultats-info">Aucun résultat parmi les localités affichées. ` +
+      `Vérifie les couches et filtres actifs.</div>`;
+    divResultats.hidden = false;
+    btnEffacer.hidden = false;
+    return;
+  }
+
+  const limites = villages.slice(0, CONFIG.maxResultatsRecherche);
+  let html = "";
+
+  if (regroupements.length) {
+    html += `<div class="resultats-separateur">Ensembles</div>`;
+    html += regroupements.map((r, i) =>
+      `<div class="resultat zone" data-type="zone" data-index="${i}">` +
+      `<span class="niveau">${echapper(r.niveau)}</span>` +
+      `<span class="nom">${echapper(r.nom)}</span>` +
+      `<span class="contexte">${r.nombre.toLocaleString("fr-FR")} localités</span></div>`
+    ).join("");
+  }
+  if (limites.length) {
+    if (regroupements.length) html += `<div class="resultats-separateur">Localités</div>`;
+    html += limites.map((r, i) =>
+      `<div class="resultat" data-type="village" data-index="${i}">` +
+      `<span class="pastille" style="background:${CONFIG.couches[r.cleCouche].couleur}"></span>` +
+      `<span class="nom">${echapper(r.nom)}</span>` +
+      `<span class="contexte">${echapper(r.contexte)}</span></div>`
+    ).join("");
+    if (villages.length > limites.length) {
+      html += `<div class="resultats-info">${villages.length - limites.length} ` +
+              `autre(s) localité(s) — précise la recherche.</div>`;
+    }
+  }
+  divResultats.innerHTML = html;
+
+  divResultats.querySelectorAll(".resultat").forEach((element) => {
+    element.addEventListener("click", () => {
+      const index = Number(element.dataset.index);
+      if (element.dataset.type === "zone") {
+        const [sud, nord, ouest, est] = regroupements[index].bornes;
+        map.fitBounds([[sud, ouest], [nord, est]], { padding: [40, 40], maxZoom: 14 });
+        return;
+      }
+      const r = limites[index];
+      const [lon, lat] = r.feature.geometry.coordinates;
+      map.setView([lat, lon], CONFIG.zoomClicVillage);
+      const m = r.feature._marqueur;
+      if (m) setTimeout(() => m.openPopup(), 250);
+    });
+  });
+  divResultats.hidden = false;
+  btnEffacer.hidden = false;
+}
+
+function lancerRecherche() {
+  const texte = document.getElementById("champ-recherche").value.trim();
+  if (!texte) { viderRecherche(); return; }
+  divErreur.hidden = true;
+
+  const coords = parserCoordonnees(texte);
+  if (coords) {
+    if (Math.abs(coords.lat) > 90 || Math.abs(coords.lon) > 180) {
+      divErreur.textContent =
+        "Coordonnées hors limites : latitude entre -90 et 90, longitude entre -180 et 180.";
+      divErreur.hidden = false;
+      return;
+    }
+    divResultats.hidden = true;
+    retirerRepere();
+    repereRecherche = L.marker([coords.lat, coords.lon]).addTo(map);
+    repereRecherche.bindPopup(
+      `<div class="popup-title">Repère</div>` +
+      `<div class="popup-row"><span class="popup-label">Coordonnées :</span> ` +
+      `${coords.lat.toFixed(5)}, ${coords.lon.toFixed(5)}</div>`
+    );
+    btnEffacer.hidden = false;
+    map.setView([coords.lat, coords.lon], 14);
+    repereRecherche.openPopup();
+    return;
+  }
+
+  if (texte.length < 2) {
+    divErreur.textContent = "Saisis au moins deux caractères, ou des coordonnées « latitude, longitude ».";
+    divErreur.hidden = false;
+    return;
+  }
+  afficherResultats(chercherParNom(texte), chercherParRegroupement(texte));
+}
+
+document.getElementById("form-recherche").addEventListener("submit", (evt) => {
+  evt.preventDefault();
+  lancerRecherche();
+});
+// Recherche au fil de la frappe, sans attendre « Valider ».
+let minuterieRecherche = null;
+document.getElementById("champ-recherche").addEventListener("input", (evt) => {
+  clearTimeout(minuterieRecherche);
+  const texte = evt.target.value.trim();
+  if (texte.length < 2 || parserCoordonnees(texte)) { divResultats.hidden = true; return; }
+  minuterieRecherche = setTimeout(
+    () => afficherResultats(chercherParNom(texte), chercherParRegroupement(texte)), 200);
+});
+
+btnEffacer.addEventListener("click", () => {
+  document.getElementById("champ-recherche").value = "";
+  viderRecherche();
+});
+
+// ---------- Démarrage ----------
+construireControles();
+majBadge(0);
+for (const province of CONFIG.provinces) chargerProvince(province.nom);
+</script>
+
+</body>
+</html>
