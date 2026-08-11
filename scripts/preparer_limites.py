@@ -28,6 +28,7 @@ import json
 import math
 import shutil
 import tempfile
+import unicodedata
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -44,6 +45,18 @@ RACINE = Path(__file__).resolve().parent.parent
 # 0,002° ≈ 220 m à l'équateur : invisible au zoom province, divise le poids par ~10.
 TOLERANCE_DEFAUT = 0.002
 DECIMALES = 5  # ≈ 1 m
+
+
+def cle_province(nom: str) -> str:
+    """Clé de comparaison tolérante aux variantes d'écriture d'une province.
+
+    Une même province s'écrit différemment selon la source : GRID3 écrit
+    « Mai-Ndombe », COD-AB « Maï-Ndombe », l'export CHDC « Maï Ndombe ».
+    Sans cette normalisation, demander « Mai-Ndombe » ne ramenait aucun
+    territoire — silencieusement, puisque les autres provinces répondaient.
+    """
+    sans_accent = unicodedata.normalize("NFKD", nom).encode("ascii", "ignore").decode()
+    return sans_accent.lower().replace("-", "").replace(" ", "").replace("'", "")
 
 
 def distance_point_segment(point, debut, fin) -> float:
@@ -193,13 +206,21 @@ def main() -> None:
         # --- Territoires (ADM2) : seulement les provinces demandées ---------
         with open(dossier / "cod_admin2.geojson", encoding="utf-8") as fichier:
             adm2 = json.load(fichier)
+        demandees = {cle_province(p): p for p in args.provinces}
         retenus = [f for f in adm2["features"]
-                   if f["properties"]["adm1_name"] in args.provinces]
+                   if cle_province(f["properties"]["adm1_name"]) in demandees]
         if not retenus:
             raise SystemExit(
                 f"Aucun territoire trouvé pour : {', '.join(args.provinces)}\n"
                 "Vérifier l'orthographe des noms de provinces."
             )
+
+        # Une province demandée qui ne ramène rien doit se voir : sans ce
+        # contrôle, elle disparaît en silence dès qu'une autre a répondu.
+        trouvees = {cle_province(f["properties"]["adm1_name"]) for f in retenus}
+        manquantes = [nom for cle, nom in demandees.items() if cle not in trouvees]
+        if manquantes:
+            print(f"    ⚠ aucune correspondance COD-AB : {', '.join(manquantes)}")
         points_avant = sum(compter_points(f["geometry"]) for f in retenus)
         territoires = []
         for feature in retenus:

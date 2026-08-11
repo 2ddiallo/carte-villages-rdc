@@ -1,17 +1,22 @@
-# Carte des villages — RDC (Est)
+# Carte des villages — RDC
 
 **Carte en ligne : <https://2ddiallo.github.io/carte-villages-rdc/>**
 
 ⚠️ **Cette adresse est publique** — voir la section [Confidentialité](#confidentialité-des-données)
 avant toute mise à jour avec des données réelles.
 
-Carte web légère (Leaflet) couvrant **Ituri, Nord-Kivu, Sud-Kivu et Tanganyika**.
-Elle superpose deux jeux de données qui restent **indépendants, jamais fusionnés** :
+Carte web légère (Leaflet) couvrant **11 provinces** : Ituri, Nord-Kivu,
+Sud-Kivu, Tanganyika, Maniema, Kwango, Haut-Katanga, Kinshasa, Kwilu,
+Mai-Ndombe et Haut-Lomami. Elle superpose deux jeux de données qui restent
+**indépendants, jamais fusionnés** :
 
 | Couche | Contenu | Points | Origine |
 |---|---|---:|---|
-| **Référentiel GRID3** | Toutes les localités nommées des 4 provinces | **24 529** | Donnée ouverte (CC BY 4.0) |
-| **Données CHDC** | L'export opérationnel mensuel | 9 712 | Export partenaire |
+| **Référentiel GRID3** | Toutes les localités nommées des 11 provinces | **60 726** | Donnée ouverte (CC BY 4.0) |
+| **Données CHDC** | L'export opérationnel mensuel | 10 852 | Export partenaire |
+
+Les 4 provinces de l'Est sont cochées à l'ouverture ; les 7 autres se chargent
+à la demande. Tout activer d'emblée représenterait 17 Mo et 60 000 points.
 
 Fonctions : clustering, popup d'attributs, limites de **provinces, de
 territoires et de zones de santé**, noms de villages au zoom, bascule de fond
@@ -31,16 +36,17 @@ carte, ne pas la retirer) :
 - **Localités** — [GRID3 COD – Settlement Names v8.0](https://data.grid3.org/datasets/GRID3::grid3-cod-settlement-names-v8-0/about)
   (décembre 2025), produit par CIESIN/Columbia et WorldPop avec l'INS et le
   Ministère de la Santé. Licence **CC BY 4.0**. 127 942 localités sur toute la
-  RDC, dont 24 529 sur les 4 provinces.
+  RDC, dont 60 726 sur les 11 provinces couvertes.
 - **Limites des zones de santé** — [GRID3 COD – Health Zones v8.0](https://data.humdata.org/dataset/grid3-cod-health-zones-v8-0)
-  (janvier 2026). Licence **CC BY 4.0**. 519 zones de santé en RDC, 115 sur les
-  4 provinces. Même millésime v8.0 que les localités : le champ `zonesante` y
+  (janvier 2026). Licence **CC BY 4.0**. 519 zones de santé en RDC, 263 sur les
+  11 provinces. Même millésime v8.0 que les localités : le champ `zonesante` y
   porte exactement les mêmes valeurs, donc le filtre de la carte et les limites
-  affichées désignent bien les mêmes entités (vérifié : 115 = 115, aucun
-  orphelin d'un côté ni de l'autre).
+  affichées désignent bien les mêmes entités (vérifié : aucun orphelin d'un
+  côté ni de l'autre).
 - **Limites administratives** — [COD-AB](https://data.humdata.org/dataset/cod-ab-cod),
   OCHA Field Information Services Section, mise à jour du 16 avril 2026.
-  Licence **CC BY-IGO**. 26 provinces (ADM1), 164 territoires (ADM2).
+  Licence **CC BY-IGO**. 26 provinces (ADM1), 164 territoires (ADM2), dont 71
+  sur les provinces couvertes.
 - **Fond satellite** — Esri World Imagery. **Fond standard** — OpenStreetMap.
 
 Remplace geoBoundaries, utilisé jusqu'ici pour les provinces : COD-AB est le
@@ -50,10 +56,10 @@ descend au territoire.
 ### Pourquoi deux couches et pas une seule
 
 Le rapprochement des deux jeux (`scripts/rapprocher_chdc_grid3.py`) donne un
-recouvrement de **35 %** seulement : sur 9 712 villages CHDC, environ 3 400
-retrouvent leur équivalent GRID3, et 1 476 n'ont **aucune** localité GRID3 dans
-un rayon de 2 km. Ce chiffre est stable entre les seuils de similarité 0,70 et
-0,85 — ce n'est pas un artefact de réglage.
+recouvrement de **35 %** seulement : sur 10 852 villages CHDC, 3 766 retrouvent
+leur équivalent GRID3, et 1 719 n'ont **aucune** localité GRID3 dans un rayon
+de 2 km. Ce chiffre est stable entre les seuils de similarité 0,70 et 0,85 —
+ce n'est pas un artefact de réglage.
 
 Trois causes, aucune n'étant une erreur de l'une ou l'autre source :
 
@@ -69,6 +75,84 @@ Fusionner produirait donc autant de faux doublons que de vrais. Les deux
 couches sont superposables à l'écran, ce qui permet de comparer visuellement
 sans rien écraser.
 
+## GRID3 face aux sources onusiennes
+
+Question légitime : pourquoi s'appuyer sur GRID3 plutôt que sur un jeu OCHA /
+Nations unies ? Comparaison faite avec les données réelles, pas sur réputation.
+
+### Les localités : OCHA « DR Congo - Settlements » (fév. 2017)
+
+C'est le jeu de localités publié par OCHA RDC sur HDX
+([`dr-congo-settlements`](https://data.humdata.org/dataset/dr-congo-settlements),
+licence ODbL, shapefile en projection World Mercator).
+
+| | OCHA 2017 | GRID3 v8.0 |
+|---|---:|---:|
+| Localités (RDC entière) | 26 710 | **127 942** |
+| Sur les 11 provinces de la carte | 13 984 | **60 726** — 4,3× plus |
+| Dernière modification | 71 % en **1994**, rien après 2010 | décembre 2025 |
+| Origine des positions | 74 % « ancienne base » MONUC / GNS, 24 % relevés GPS | relevés terrain PNLP / IMA / CIESIN, 2021-2022 |
+
+**Recouvrement mesuré** (11 provinces) : 75 % des localités OCHA ont un point
+GRID3 à moins de 2 km — médiane de 823 m — mais seulement **34 % correspondent
+aussi par le nom**. L'écart est donc surtout **nominal** : GRID3 connaît le
+lieu, mais les graphies ont divergé en trente ans. À l'inverse, **56 127
+localités GRID3 (92 %) n'ont aucun équivalent OCHA.**
+
+### Ce que OCHA apporte que GRID3 n'a pas
+
+La comparaison n'est pas à sens unique. OCHA porte la **hiérarchie
+administrative coutumière**, absente de GRID3 :
+
+| Champ OCHA | Renseigné | Équivalent GRID3 |
+|---|---:|---|
+| `TERRITOIRE` | 99,9 % | aucun (ajouté ici par géométrie) |
+| `COLLECTIV` (collectivité / chefferie) | 96,0 % | **aucun** |
+| `GROUPEMENT` | 27,5 % | **aucun** |
+| `CODE_INS` (code INS) | 14,0 % | aucun |
+
+GRID3 est structuré selon le découpage **sanitaire** (province → zone de santé
+→ aire de santé), OCHA selon le découpage **administratif coutumier**
+(territoire → collectivité → groupement). Pour un travail sur les chefferies et
+groupements, le jeu OCHA reste la référence malgré son âge.
+
+### Les zones de santé : les deux sources concordent
+
+Contrôle rassurant sur la couche affichée par la carte :
+
+| | OCHA (sept. 2019) | GRID3 v8.0 (janv. 2026) |
+|---|---:|---:|
+| Zones de santé en RDC | 519 | **519** |
+
+Sur les 263 zones des 11 provinces, **245 portent un nom identique**. Les 18
+écarts sont des subdivisions de Kinshasa (Kalamu 1/2, Masina 1/2, Maluku 1/2,
+Mont Ngafula 1/2) et trois renommages en Ituri (Gety, Mongbwalu, Nyankunde) —
+pas un désaccord de découpage. C'est bien la carte sanitaire officielle du
+Ministère de la Santé dans les deux cas.
+
+### Et OpenStreetMap ?
+
+[HOT OSM](https://data.humdata.org/dataset/hotosm_cod_populated_places) publie
+un extrait actualisé quotidiennement. Sur les 4 provinces de l'Est, il compte
+84 377 nœuds `place` — mais **78 970 sont sans nom** (bâti cartographié à
+distance). Il ne reste que ~5 400 lieux nommés, moins que GRID3, sous licence
+ODbL contaminante en cas de fusion. Non retenu.
+
+### Conclusion
+
+GRID3 est retenu comme socle parce qu'il est **4,3× plus dense, trente ans plus
+récent, et issu de relevés GPS de terrain**. C'est aussi une production
+conjointe CIESIN/Columbia, WorldPop, INS et Ministère de la Santé — pas une
+source tierce face à l'ONU, mais le référentiel que les acteurs humanitaires
+utilisent aujourd'hui en RDC.
+
+Ses limites, à garder en tête : pas de hiérarchie administrative coutumière, et
+un découpage provincial qui diverge parfois du COD-AB d'OCHA (2,2 % des points
+tombent hors des limites de leur propre province, jusqu'à 17,5 % au Mai-Ndombe,
+province de lacs et marécages aux contours mouvants).
+
+Pour rejouer cette comparaison : `scripts/comparer_ocha_grid3.py`.
+
 ## Structure du projet
 
 ```
@@ -76,13 +160,20 @@ carte-villages-rdc/
 ├── index.html                          La carte (page unique, autonome)
 ├── data/
 │   ├── grid3_ituri.geojson             Localités GRID3, un fichier par province
-│   ├── grid3_nord-kivu.geojson           (générés — ne pas éditer à la main)
-│   ├── grid3_sud-kivu.geojson
+│   ├── grid3_nord-kivu.geojson           (11 fichiers générés — ne pas éditer
+│   ├── grid3_sud-kivu.geojson             à la main)
 │   ├── grid3_tanganyika.geojson
+│   ├── grid3_maniema.geojson
+│   ├── grid3_kwango.geojson
+│   ├── grid3_haut-katanga.geojson
+│   ├── grid3_kinshasa.geojson
+│   ├── grid3_kwilu.geojson
+│   ├── grid3_mai-ndombe.geojson
+│   ├── grid3_haut-lomami.geojson
 │   ├── villages.geojson                Couche CHDC (générée)
 │   ├── provinces.geojson               Limites ADM1 — 26 provinces (générée)
-│   ├── territoires.geojson             Limites ADM2 — 29 territoires (générée)
-│   ├── zones_sante.geojson             Limites des 115 zones de santé (générée)
+│   ├── territoires.geojson             Limites ADM2 — 71 territoires (générée)
+│   ├── zones_sante.geojson             Limites des 263 zones de santé (générée)
 │   └── rapprochement_chdc_absents.csv  Villages CHDC sans équivalent GRID3
 ├── data_source/
 │   └── Villages_CHDC_2607.xlsx         Dernier export CHDC reçu
@@ -152,7 +243,7 @@ python3 scripts/attribuer_territoires.py
   simplifie les contours (Douglas-Peucker, tolérance 0,002° ≈ 220 m) : les
   provinces passent de 97 600 à 21 548 points. Les contours de la carte sont
   donc **indicatifs**, pas une référence juridique.
-- `moissonner_zones_sante.py` télécharge les 115 zones de santé et les
+- `moissonner_zones_sante.py` télécharge les 263 zones de santé et les
   simplifie plus fortement (tolérance 0,003° ≈ 330 m) : les polygones source
   sont énormes (1 024 294 points au total, jusqu'à ~7 300 pour une seule zone)
   et tombent à 14 997 points, soit 0,29 Mo. Sans cela le fichier pèserait

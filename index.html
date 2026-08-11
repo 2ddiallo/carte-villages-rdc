@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<title>Carte des villages — RDC (Est)</title>
+<title>Carte des villages — RDC</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.min.css" />
@@ -217,7 +217,7 @@
 
 <div class="ui-topleft">
   <div class="panel">
-    <h1>Carte des villages — RDC (Est)</h1>
+    <h1>Carte des villages — RDC</h1>
     <p>Clique sur un groupe pour zoomer, puis sur un point pour voir les détails.</p>
 
     <details class="bloc" open>
@@ -307,11 +307,21 @@
 // Les champs absents ou vides sont ignorés.
 // =========================================================================
 const CONFIG = {
+  // Les 4 provinces de l'Est sont cochées d'emblée ; les 7 autres sont
+  // proposées mais non chargées tant qu'on ne les coche pas. Tout activer
+  // représenterait 17 Mo et 60 000 points au premier affichage.
   provinces: [
-    { nom: "Ituri",      fichier: "data/grid3_ituri.geojson" },
-    { nom: "Nord-Kivu",  fichier: "data/grid3_nord-kivu.geojson" },
-    { nom: "Sud-Kivu",   fichier: "data/grid3_sud-kivu.geojson" },
-    { nom: "Tanganyika", fichier: "data/grid3_tanganyika.geojson" },
+    { nom: "Ituri",        fichier: "data/grid3_ituri.geojson",        active: true },
+    { nom: "Nord-Kivu",    fichier: "data/grid3_nord-kivu.geojson",    active: true },
+    { nom: "Sud-Kivu",     fichier: "data/grid3_sud-kivu.geojson",     active: true },
+    { nom: "Tanganyika",   fichier: "data/grid3_tanganyika.geojson",   active: true },
+    { nom: "Maniema",      fichier: "data/grid3_maniema.geojson" },
+    { nom: "Kwango",       fichier: "data/grid3_kwango.geojson" },
+    { nom: "Haut-Katanga", fichier: "data/grid3_haut-katanga.geojson" },
+    { nom: "Kinshasa",     fichier: "data/grid3_kinshasa.geojson" },
+    { nom: "Kwilu",        fichier: "data/grid3_kwilu.geojson" },
+    { nom: "Mai-Ndombe",   fichier: "data/grid3_mai-ndombe.geojson" },
+    { nom: "Haut-Lomami",  fichier: "data/grid3_haut-lomami.geojson" },
   ],
   couches: {
     grid3: {
@@ -358,6 +368,22 @@ const CONFIG = {
   maxResultatsRecherche: 25,
 };
 
+// Une même province s'écrit différemment selon la source : GRID3 « Mai-Ndombe »,
+// COD-AB « Maï-Ndombe », export CHDC « Maï Ndombe ». On ramène toutes les
+// graphies à une clé unique, sinon les villages CHDC d'une province seraient
+// silencieusement absents de la carte.
+function cleProvince(nom) {
+  return String(nom || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase().replace(/[-\s']/g, "");
+}
+const PROVINCE_PAR_CLE = new Map(
+  CONFIG.provinces.map((p) => [cleProvince(p.nom), p.nom])
+);
+// Nom canonique d'une province quelle que soit son orthographe d'origine.
+function provinceCanonique(nom) {
+  return PROVINCE_PAR_CLE.get(cleProvince(nom));
+}
+
 // ---------- Initialisation carte ----------
 const map = L.map("map", { zoomControl: false, preferCanvas: true }).setView([-2.0, 28.5], 6);
 L.control.zoom({ position: "bottomright" }).addTo(map);
@@ -395,7 +421,9 @@ const etat = {
   grid3: new Map(),
   // toutes les features CHDC, filtrées ensuite par province
   chdc: null,
-  provincesActives: new Set(CONFIG.provinces.map((p) => p.nom)),
+  provincesActives: new Set(
+    CONFIG.provinces.filter((p) => p.active).map((p) => p.nom)
+  ),
   couchesActives: new Set(["grid3"]),
   territoire: "",
   zoneSante: "",
@@ -577,7 +605,10 @@ function passeFiltres(feature, cleCouche) {
   const couche = CONFIG.couches[cleCouche];
   const p = feature.properties || {};
 
-  if (!etat.provincesActives.has(p[couche.champProvince])) return false;
+  // La province doit être ramenée à son nom canonique : l'export CHDC et
+  // GRID3 ne l'écrivent pas toujours pareil.
+  const nomProvince = provinceCanonique(p[couche.champProvince]);
+  if (!nomProvince || !etat.provincesActives.has(nomProvince)) return false;
   if (etat.territoire && p[couche.champTerritoire] !== etat.territoire) return false;
   // Zone de santé et type n'existent que dans GRID3 : quand ils sont
   // renseignés, la couche CHDC est masquée plutôt que filtrée à tort.
@@ -725,7 +756,8 @@ function construireControles() {
     ligne.className = "ligne-case";
     ligne.dataset.province = province.nom;
     ligne.innerHTML =
-      `<input type="checkbox" id="prov-${echapper(province.nom)}" checked>` +
+      `<input type="checkbox" id="prov-${echapper(province.nom)}"` +
+      `${etat.provincesActives.has(province.nom) ? " checked" : ""}>` +
       `<label for="prov-${echapper(province.nom)}">${echapper(province.nom)}` +
       `<span class="compte"></span></label>`;
     ligne.querySelector("input").addEventListener("change", (evt) => {
@@ -790,7 +822,8 @@ function majListesFiltres() {
   }
   for (const f of etat.chdc || []) {
     const p = f.properties;
-    if (etat.provincesActives.has(p.Province) && p.Territory) territoires.add(p.Territory);
+    const prov = provinceCanonique(p.Province);
+    if (prov && etat.provincesActives.has(prov) && p.Territory) territoires.add(p.Territory);
   }
 
   remplirSelect("filtre-territoire", territoires, etat.territoire, "Tous");
@@ -829,7 +862,10 @@ function majComptes() {
   }
   const compteChdc = document.querySelector('[data-couche="chdc"] .compte');
   if (compteChdc && etat.chdc && !compteChdc.textContent.includes("indispo")) {
-    const total = etat.chdc.filter((f) => etat.provincesActives.has(f.properties.Province)).length;
+    const total = etat.chdc.filter((f) => {
+      const prov = provinceCanonique(f.properties.Province);
+      return prov && etat.provincesActives.has(prov);
+    }).length;
     compteChdc.textContent = total.toLocaleString("fr-FR");
   }
 }
@@ -1088,7 +1124,9 @@ btnEffacer.addEventListener("click", () => {
 // ---------- Démarrage ----------
 construireControles();
 majBadge(0);
-for (const province of CONFIG.provinces) chargerProvince(province.nom);
+// Seules les provinces cochées au démarrage sont téléchargées ; les autres
+// le seront à la demande, quand l'utilisateur cochera leur case.
+for (const nom of etat.provincesActives) chargerProvince(nom);
 </script>
 
 </body>

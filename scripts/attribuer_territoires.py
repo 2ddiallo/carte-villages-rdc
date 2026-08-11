@@ -36,6 +36,16 @@ def slug(texte: str) -> str:
     return sans_accent.lower().replace(" ", "-")
 
 
+def cle_province(nom: str) -> str:
+    """Comparaison tolérante aux variantes d'écriture entre sources.
+
+    GRID3 écrit « Mai-Ndombe », COD-AB « Maï-Ndombe » : sans cette
+    normalisation, aucun territoire ne serait rattaché à cette province.
+    """
+    sans_accent = unicodedata.normalize("NFKD", nom).encode("ascii", "ignore").decode()
+    return sans_accent.lower().replace("-", "").replace(" ", "").replace("'", "")
+
+
 def anneaux_polygones(geometrie: dict) -> list:
     """Normalise Polygon / MultiPolygon en une liste de polygones (1er anneau = contour)."""
     if geometrie["type"] == "Polygon":
@@ -124,7 +134,12 @@ def main() -> None:
             donnees = json.load(fichier)
 
         # On ne teste que les territoires de la province concernée.
-        candidats = [t for t in territoires if t["province"] == province]
+        candidats = [t for t in territoires
+                     if cle_province(t["province"]) == cle_province(province)]
+        if not candidats:
+            print(f"{province:<14} ⚠ aucun territoire dans territoires.geojson — "
+                  f"relancer preparer_limites.py avec cette province")
+            continue
         attribues = 0
 
         for feature in donnees["features"]:

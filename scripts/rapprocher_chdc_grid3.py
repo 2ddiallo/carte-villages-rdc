@@ -42,7 +42,9 @@ from collections import defaultdict
 from difflib import SequenceMatcher
 from pathlib import Path
 
-PROVINCES = ["Ituri", "Nord-Kivu", "Sud-Kivu", "Tanganyika"]
+PROVINCES_DEFAUT = ["Ituri", "Nord-Kivu", "Sud-Kivu", "Tanganyika", "Maniema",
+                    "Kwango", "Haut-Katanga", "Kinshasa", "Kwilu", "Mai-Ndombe",
+                    "Haut-Lomami"]
 
 RACINE = Path(__file__).resolve().parent.parent
 
@@ -63,6 +65,12 @@ PAS_CELLULE = 0.02
 def slug(texte: str) -> str:
     sans_accent = unicodedata.normalize("NFKD", texte).encode("ascii", "ignore").decode()
     return sans_accent.lower().replace(" ", "-")
+
+
+def cle_province(nom) -> str:
+    """Ramène les graphies divergentes d'une province à une clé unique."""
+    s = unicodedata.normalize("NFKD", str(nom or "")).encode("ascii", "ignore").decode()
+    return s.lower().replace("-", "").replace(" ", "")
 
 
 def normaliser(nom) -> str:
@@ -151,7 +159,9 @@ def charger_chdc() -> dict:
     for feature in donnees["features"]:
         lon, lat = feature["geometry"]["coordinates"]
         proprietes = feature["properties"]
-        par_province[proprietes.get("Province")].append({
+        # L'export CHDC écrit « Maï Ndombe » là où GRID3 écrit « Mai-Ndombe » :
+        # on indexe sur une clé normalisée pour que les deux se retrouvent.
+        par_province[cle_province(proprietes.get("Province"))].append({
             "lat": lat,
             "lon": lon,
             "nom": proprietes.get("Village", ""),
@@ -215,6 +225,8 @@ def main() -> None:
     )
     parser.add_argument("--seuil-nom", type=float, default=0.85,
                         help="Similarité minimale des noms (0 à 1, défaut : 0.85)")
+    parser.add_argument("--provinces", nargs="+", default=PROVINCES_DEFAUT,
+                        help="Provinces à comparer (défaut : les 11 de la carte)")
     args = parser.parse_args()
 
     chdc = charger_chdc()
@@ -225,8 +237,8 @@ def main() -> None:
     print(f"{'Province':<12} {'CHDC':>6} {'GRID3':>7} {'sûrs':>6} {'probab.':>8} {'absents':>8} {'GRID3 seuls':>12}")
     print("─" * 65)
 
-    for province in PROVINCES:
-        villages = chdc.get(province, [])
+    for province in args.provinces:
+        villages = chdc.get(cle_province(province), [])
         points = charger_grid3(province)
         cellules = indexer(points)
 

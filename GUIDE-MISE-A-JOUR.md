@@ -179,65 +179,72 @@ git add data/ index.html && git commit -m "MAJ villages + nouvelle colonne" && g
 
 ## C — Des villages dans une nouvelle province
 
-⚠️ **À connaître : la carte n'affiche que 4 provinces.** Tout village CHDC situé
-ailleurs est chargé mais **jamais affiché, et sans aucun message d'erreur.**
+La carte couvre **11 provinces** : Ituri, Nord-Kivu, Sud-Kivu, Tanganyika,
+Maniema, Kwango, Haut-Katanga, Kinshasa, Kwilu, Mai-Ndombe et Haut-Lomami.
+Les 10 852 villages de l'export CHDC de juillet 2026 y sont tous couverts.
 
-Dans l'export de juillet 2026, **1 140 des 10 852 villages sont dans ce cas** :
-
-| Province | Villages | Sur la carte |
-|---|---:|---|
-| Ituri | 3 504 | oui |
-| Nord-Kivu | 2 659 | oui |
-| Sud-Kivu | 2 096 | oui |
-| Tanganyika | 1 453 | oui |
-| Maniema | 283 | **non** |
-| Kwango | 275 | **non** |
-| Haut-Katanga | 165 | **non** |
-| Kinshasa | 129 | **non** |
-| Kwilu | 120 | **non** |
-| Maï Ndombe | 119 | **non** |
-| Haut-Lomami | 49 | **non** |
+⚠️ **Mais si ton nouvel export contient une province hors de cette liste** (par
+exemple Tshopo ou Lualaba), ses villages seront chargés mais **jamais affichés,
+sans aucun message d'erreur.** Le contrôle ci-dessous prend dix secondes.
 
 Pour savoir ce que contient ton nouvel export :
 
 ```bash
 python3 -c "
 import json, collections
+COUVERTES = {'ituri','nordkivu','sudkivu','tanganyika','maniema','kwango',
+             'hautkatanga','kinshasa','kwilu','maindombe','hautlomami'}
+import unicodedata
+def cle(n):
+    s = unicodedata.normalize('NFKD', n).encode('ascii','ignore').decode()
+    return s.lower().replace('-','').replace(' ','')
 d = json.load(open('data/villages.geojson'))['features']
 for p, n in collections.Counter(f['properties']['Province'] for f in d).most_common():
-    print('%-16s %6d' % (p, n))
+    print('%-16s %6d  %s' % (p, n, 'ok' if cle(p) in COUVERTES else '← NON COUVERTE'))
 "
 ```
 
 ### Ajouter une province
 
-Exemple avec le **Maniema**. Le nom doit être écrit exactement comme dans
+Exemple avec la **Tshopo**. Le nom doit être écrit exactement comme dans
 GRID3 (voir la liste en bas de ce guide).
 
 **1. Télécharger ses données** — les trois premières commandes sont
 indépendantes, la quatrième a besoin des précédentes :
 
 ```bash
-python3 scripts/moissonner_grid3.py --provinces Ituri Nord-Kivu Sud-Kivu Tanganyika Maniema
-python3 scripts/preparer_limites.py --provinces Ituri Nord-Kivu Sud-Kivu Tanganyika Maniema
-python3 scripts/moissonner_zones_sante.py --provinces Ituri Nord-Kivu Sud-Kivu Tanganyika Maniema
-python3 scripts/attribuer_territoires.py --provinces Ituri Nord-Kivu Sud-Kivu Tanganyika Maniema
+python3 scripts/moissonner_grid3.py --provinces Ituri Nord-Kivu Sud-Kivu Tanganyika Maniema Kwango Haut-Katanga \
+    Kinshasa Kwilu Mai-Ndombe Haut-Lomami Tshopo
+python3 scripts/preparer_limites.py --provinces Ituri Nord-Kivu Sud-Kivu Tanganyika Maniema Kwango Haut-Katanga \
+    Kinshasa Kwilu Mai-Ndombe Haut-Lomami Tshopo
+python3 scripts/moissonner_zones_sante.py --provinces Ituri Nord-Kivu Sud-Kivu Tanganyika Maniema Kwango Haut-Katanga \
+    Kinshasa Kwilu Mai-Ndombe Haut-Lomami Tshopo
+python3 scripts/attribuer_territoires.py --provinces Ituri Nord-Kivu Sud-Kivu Tanganyika Maniema Kwango Haut-Katanga \
+    Kinshasa Kwilu Mai-Ndombe Haut-Lomami Tshopo
 ```
 
 > Il faut **relister toutes les provinces** à chaque fois, pas seulement la
 > nouvelle : ces scripts réécrivent les fichiers de limites en entier.
 
-**2. Déclarer la province dans la carte** — dans `index.html`, bloc `CONFIG` :
+**2. Déclarer la province dans la carte** — dans `index.html`, bloc `CONFIG`,
+ajoute une ligne à la liste `provinces` :
 
 ```js
 provinces: [
-  { nom: "Ituri",      fichier: "data/grid3_ituri.geojson" },
-  { nom: "Nord-Kivu",  fichier: "data/grid3_nord-kivu.geojson" },
-  { nom: "Sud-Kivu",   fichier: "data/grid3_sud-kivu.geojson" },
-  { nom: "Tanganyika", fichier: "data/grid3_tanganyika.geojson" },
-  { nom: "Maniema",    fichier: "data/grid3_maniema.geojson" },   // ← ajout
+  { nom: "Ituri",       fichier: "data/grid3_ituri.geojson", active: true },
+  ...
+  { nom: "Haut-Lomami", fichier: "data/grid3_haut-lomami.geojson" },
+  { nom: "Tshopo",      fichier: "data/grid3_tshopo.geojson" },   // ← ajout
 ],
 ```
+
+`active: true` coche la province à l'ouverture. Sans ce drapeau, elle est
+proposée mais chargée seulement si l'utilisateur coche sa case — c'est le bon
+choix par défaut, chaque province pesant 1 à 2 Mo.
+
+Les différences d'orthographe entre sources (« Mai-Ndombe » côté GRID3,
+« Maï-Ndombe » côté OCHA, « Maï Ndombe » côté CHDC) sont gérées
+automatiquement : il suffit d'écrire le nom **GRID3**.
 
 Le nom du fichier suit toujours la même règle : préfixe `grid3_`, puis le nom
 de la province en minuscules, sans accent, espaces remplacés par des tirets.
