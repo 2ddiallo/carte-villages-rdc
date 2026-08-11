@@ -97,7 +97,9 @@ carte-villages-rdc/
 
 ## Mise à jour mensuelle de la couche CHDC
 
-C'est la seule opération récurrente.
+C'est la seule opération récurrente. **Procédure pas à pas, avec
+dépannage et cas particuliers : [GUIDE-MISE-A-JOUR.md](GUIDE-MISE-A-JOUR.md).**
+Le résumé ci-dessous suffit pour un export habituel.
 
 1. Déposer le nouvel export (`.xlsx`, `.xls` ou `.csv`) dans `data_source/`.
 2. Depuis le dossier du projet :

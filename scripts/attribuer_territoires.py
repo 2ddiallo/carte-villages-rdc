@@ -4,6 +4,7 @@ Ajoute le territoire à chaque localité GRID3, par recoupement géométrique.
 
 Usage :
     python3 scripts/attribuer_territoires.py
+    python3 scripts/attribuer_territoires.py --provinces Ituri Maniema
 
 Le référentiel GRID3 est organisé selon le découpage sanitaire (province →
 zone de santé → aire de santé) et ne porte aucun champ « territoire ».
@@ -21,11 +22,12 @@ d'affichage, mais ces valeurs ne sont pas une source administrative.
 preparer_limites.py. Le champ ajouté est « territoire ».
 """
 
+import argparse
 import json
 import unicodedata
 from pathlib import Path
 
-PROVINCES = ["Ituri", "Nord-Kivu", "Sud-Kivu", "Tanganyika"]
+PROVINCES_DEFAUT = ["Ituri", "Nord-Kivu", "Sud-Kivu", "Tanganyika"]
 RACINE = Path(__file__).resolve().parent.parent
 
 
@@ -98,13 +100,20 @@ def charger_territoires() -> list:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Attribue son territoire à chaque localité GRID3."
+    )
+    parser.add_argument("--provinces", nargs="+", default=PROVINCES_DEFAUT,
+                        help=f"Provinces à traiter (défaut : {' '.join(PROVINCES_DEFAUT)})")
+    args = parser.parse_args()
+
     territoires = charger_territoires()
     print(f"{len(territoires)} polygones de territoires chargés\n")
 
     total_attribues = 0
     total_points = 0
 
-    for province in PROVINCES:
+    for province in args.provinces:
         chemin = RACINE / "data" / f"grid3_{slug(province)}.geojson"
         if not chemin.exists():
             raise SystemExit(
