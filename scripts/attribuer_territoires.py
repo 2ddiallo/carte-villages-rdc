@@ -24,10 +24,13 @@ preparer_limites.py. Le champ ajouté est « territoire ».
 
 import argparse
 import json
+import sys
 import unicodedata
 from pathlib import Path
 
-PROVINCES_DEFAUT = ["Ituri", "Nord-Kivu", "Sud-Kivu", "Tanganyika"]
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from moissonner_grid3 import PROVINCES_RDC as PROVINCES_DEFAUT  # noqa: E402
+
 RACINE = Path(__file__).resolve().parent.parent
 
 
@@ -114,7 +117,7 @@ def main() -> None:
         description="Attribue son territoire à chaque localité GRID3."
     )
     parser.add_argument("--provinces", nargs="+", default=PROVINCES_DEFAUT,
-                        help=f"Provinces à traiter (défaut : {' '.join(PROVINCES_DEFAUT)})")
+                        help="Provinces à traiter (défaut : les 26)")
     args = parser.parse_args()
 
     territoires = charger_territoires()

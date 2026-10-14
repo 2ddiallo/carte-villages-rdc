@@ -177,6 +177,26 @@
   .territoire-label::before { display:none !important; }
   .montrer-territoires .territoire-label { opacity:1 !important; }
 
+  /* Étiquettes de secteurs et chefferies (découpage coutumier, millésime 2010) */
+  .secteur-label {
+    background:none; border:none; box-shadow:none; padding:0; margin:0;
+    color:#fcd34d; font-size:10.5px; font-weight:600; letter-spacing:.02em;
+    white-space:nowrap; text-shadow:0 0 4px #000, 0 0 4px #000;
+    pointer-events:none; opacity:0 !important; transition:opacity .12s;
+  }
+  .secteur-label::before { display:none !important; }
+  .montrer-secteurs .secteur-label { opacity:1 !important; }
+
+  /* Étiquettes de chefs-lieux de groupements (millésime 2009) */
+  .groupement-label {
+    background:none; border:none; box-shadow:none; padding:0; margin:0;
+    color:#fde68a; font-size:10px; font-weight:500;
+    white-space:nowrap; text-shadow:0 0 4px #000, 0 0 4px #000;
+    pointer-events:none; opacity:0 !important; transition:opacity .12s;
+  }
+  .groupement-label::before { display:none !important; }
+  .montrer-groupements .groupement-label { opacity:1 !important; }
+
   .popup-title { font-weight:700; font-size:14px; color:#1a3a5c; margin-bottom:2px; }
   .popup-source {
     font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.04em;
@@ -258,6 +278,14 @@
           <label for="case-zones-sante">Limites de zones de santé</label>
         </div>
         <div class="ligne-case">
+          <input type="checkbox" id="case-secteurs">
+          <label for="case-secteurs">Secteurs et chefferies <span style="color:#b08d3f">(2010)</span></label>
+        </div>
+        <div class="ligne-case">
+          <input type="checkbox" id="case-groupements">
+          <label for="case-groupements">Chefs-lieux de groupements <span style="color:#b08d3f">(2009)</span></label>
+        </div>
+        <div class="ligne-case">
           <input type="checkbox" id="case-noms" checked>
           <label for="case-noms">Noms des villages au zoom</label>
         </div>
@@ -307,21 +335,36 @@
 // Les champs absents ou vides sont ignorés.
 // =========================================================================
 const CONFIG = {
-  // Les 4 provinces de l'Est sont cochées d'emblée ; les 7 autres sont
-  // proposées mais non chargées tant qu'on ne les coche pas. Tout activer
-  // représenterait 17 Mo et 60 000 points au premier affichage.
+  // Les 26 provinces sont proposées ; seules les 4 de l'Est sont cochées
+  // d'emblée. Tout activer représenterait 40 Mo et 127 942 points au premier
+  // affichage — chaque province pèse 0,4 à 3 Mo et se charge à la demande.
   provinces: [
-    { nom: "Ituri",        fichier: "data/grid3_ituri.geojson",        active: true },
-    { nom: "Nord-Kivu",    fichier: "data/grid3_nord-kivu.geojson",    active: true },
-    { nom: "Sud-Kivu",     fichier: "data/grid3_sud-kivu.geojson",     active: true },
-    { nom: "Tanganyika",   fichier: "data/grid3_tanganyika.geojson",   active: true },
-    { nom: "Maniema",      fichier: "data/grid3_maniema.geojson" },
-    { nom: "Kwango",       fichier: "data/grid3_kwango.geojson" },
-    { nom: "Haut-Katanga", fichier: "data/grid3_haut-katanga.geojson" },
-    { nom: "Kinshasa",     fichier: "data/grid3_kinshasa.geojson" },
-    { nom: "Kwilu",        fichier: "data/grid3_kwilu.geojson" },
-    { nom: "Mai-Ndombe",   fichier: "data/grid3_mai-ndombe.geojson" },
-    { nom: "Haut-Lomami",  fichier: "data/grid3_haut-lomami.geojson" },
+    { nom: "Bas-Uele",        fichier: "data/grid3_bas-uele.geojson" },
+    { nom: "Equateur",        fichier: "data/grid3_equateur.geojson" },
+    { nom: "Haut-Katanga",    fichier: "data/grid3_haut-katanga.geojson" },
+    { nom: "Haut-Lomami",     fichier: "data/grid3_haut-lomami.geojson" },
+    { nom: "Haut-Uele",       fichier: "data/grid3_haut-uele.geojson" },
+    { nom: "Ituri",           fichier: "data/grid3_ituri.geojson",          active: true },
+    { nom: "Kasaï",           fichier: "data/grid3_kasai.geojson" },
+    { nom: "Kasaï-Central",   fichier: "data/grid3_kasai-central.geojson" },
+    { nom: "Kasaï-Oriental",  fichier: "data/grid3_kasai-oriental.geojson" },
+    { nom: "Kinshasa",        fichier: "data/grid3_kinshasa.geojson" },
+    { nom: "Kongo-Central",   fichier: "data/grid3_kongo-central.geojson" },
+    { nom: "Kwango",          fichier: "data/grid3_kwango.geojson" },
+    { nom: "Kwilu",           fichier: "data/grid3_kwilu.geojson" },
+    { nom: "Lomami",          fichier: "data/grid3_lomami.geojson" },
+    { nom: "Lualaba",         fichier: "data/grid3_lualaba.geojson" },
+    { nom: "Mai-Ndombe",      fichier: "data/grid3_mai-ndombe.geojson" },
+    { nom: "Maniema",         fichier: "data/grid3_maniema.geojson" },
+    { nom: "Mongala",         fichier: "data/grid3_mongala.geojson" },
+    { nom: "Nord-Kivu",       fichier: "data/grid3_nord-kivu.geojson",      active: true },
+    { nom: "Nord-Ubangi",     fichier: "data/grid3_nord-ubangi.geojson" },
+    { nom: "Sankuru",         fichier: "data/grid3_sankuru.geojson" },
+    { nom: "Sud-Kivu",        fichier: "data/grid3_sud-kivu.geojson",       active: true },
+    { nom: "Sud-Ubangi",      fichier: "data/grid3_sud-ubangi.geojson" },
+    { nom: "Tanganyika",      fichier: "data/grid3_tanganyika.geojson",     active: true },
+    { nom: "Tshopo",          fichier: "data/grid3_tshopo.geojson" },
+    { nom: "Tshuapa",         fichier: "data/grid3_tshuapa.geojson" },
   ],
   couches: {
     grid3: {
@@ -438,6 +481,12 @@ map.createPane("territoires");
 map.getPane("territoires").style.zIndex = 351;
 map.createPane("zones-sante");
 map.getPane("zones-sante").style.zIndex = 352;
+// Les secteurs passent sous les territoires : c'est un découpage plus fin,
+// mais d'un millésime bien plus ancien — il ne doit pas masquer le reste.
+map.createPane("secteurs");
+map.getPane("secteurs").style.zIndex = 349;
+map.createPane("groupements");
+map.getPane("groupements").style.zIndex = 353;
 
 // Couches d'habillage. Les limites administratives (province, territoire)
 // reprennent la couleur du fond ; les zones de santé, qui relèvent d'un autre
@@ -451,6 +500,7 @@ const HABILLAGE = {
     },
   },
   territoires: {
+    case: "case-territoires",
     url: "data/territoires.geojson", pane: "territoires", classeEtiquette: "territoire-label",
     style: {
       satellite: { color: "#ffffff", weight: 1, opacity: 0.5, fill: false, dashArray: "4,4" },
@@ -458,10 +508,34 @@ const HABILLAGE = {
     },
   },
   zonesSante: {
+    case: "case-zones-sante",
     url: "data/zones_sante.geojson", pane: "zones-sante", classeEtiquette: "zone-sante-label",
     style: {
       satellite: { color: "#6ee7b7", weight: 1.2, opacity: 0.85, fill: false, dashArray: "2,3" },
       standard:  { color: "#0f6b4f", weight: 1.2, opacity: 0.6, fill: false, dashArray: "2,3" },
+    },
+  },
+  // Découpage coutumier. En ambre, distinct du blanc administratif et du vert
+  // sanitaire : ces limites datent de 2009-2010 et n'ont pas le même statut.
+  // Chargées seulement si l'on coche la case (1,8 Mo).
+  secteurs: {
+    case: "case-secteurs",
+    url: "data/secteurs.geojson", pane: "secteurs", classeEtiquette: "secteur-label",
+    paresseux: true,
+    style: {
+      satellite: { color: "#fbbf24", weight: 1.1, opacity: 0.7, fill: false, dashArray: "6,3" },
+      standard:  { color: "#a16207", weight: 1.1, opacity: 0.55, fill: false, dashArray: "6,3" },
+    },
+  },
+  groupements: {
+    case: "case-groupements",
+    url: "data/groupements.geojson", pane: "groupements", classeEtiquette: "groupement-label",
+    paresseux: true, points: true,
+    style: {
+      satellite: { radius: 3, color: "#fde68a", weight: 1, opacity: 0.9,
+                   fillColor: "#f59e0b", fillOpacity: 0.9 },
+      standard:  { radius: 3, color: "#78350f", weight: 1, opacity: 0.8,
+                   fillColor: "#f59e0b", fillOpacity: 0.9 },
     },
   },
 };
@@ -473,34 +547,62 @@ for (const cle of Object.keys(HABILLAGE)) habillage[cle] = { couche: null, etiqu
 
 function chargerLimites(cle) {
   const config = HABILLAGE[cle];
-  return fetch(config.url, { cache: "no-cache" })
+  if (habillage[cle].promesse) return habillage[cle].promesse;
+
+  habillage[cle].promesse = fetch(config.url, { cache: "no-cache" })
     .then((rep) => { if (!rep.ok) throw new Error(`HTTP ${rep.status}`); return rep.json(); })
     .then((geojson) => {
       const couche = L.geoJSON(geojson, {
         pane: config.pane,
         interactive: false,
-        style: config.style[fondActuel],
+        // Les couches de points (chefs-lieux de groupements) ont besoin d'une
+        // fabrique : sans elle, Leaflet poserait un marqueur-épingle par point.
+        pointToLayer: config.points
+          ? (feature, position) => L.circleMarker(position,
+              Object.assign({ pane: config.pane, interactive: false }, config.style[fondActuel]))
+          : undefined,
+        style: config.points ? undefined : config.style[fondActuel],
       }).addTo(map);
       couche.eachLayer((l) => {
         const nom = l.feature && l.feature.properties && l.feature.properties.nom;
         if (!nom) return;
+        // Un point n'a pas d'emprise : son étiquette se pose sur lui, décalée
+        // pour ne pas recouvrir la pastille.
+        const ancrage = l.getBounds ? l.getBounds().getCenter() : l.getLatLng();
         habillage[cle].etiquettes.push(
           L.tooltip({
-            permanent: true, direction: "center",
+            permanent: true,
+            direction: config.points ? "right" : "center",
+            offset: config.points ? [5, 0] : [0, 0],
             className: config.classeEtiquette, interactive: false,
-          }).setLatLng(l.getBounds().getCenter()).setContent(String(nom)).addTo(map)
+          }).setLatLng(ancrage).setContent(String(nom)).addTo(map)
         );
       });
       habillage[cle].couche = couche;
       majLabels();
     })
-    .catch((err) => console.warn(`Limites (${cle}) non chargées :`, err.message));
+    .catch((err) => {
+      habillage[cle].promesse = null;   // permet de réessayer
+      console.warn(`Limites (${cle}) non chargées :`, err.message);
+    });
+  return habillage[cle].promesse;
 }
 
-for (const cle of Object.keys(HABILLAGE)) chargerLimites(cle);
+// Les couches marquées « paresseux » ne descendent qu'au premier cochage :
+// secteurs et groupements pèsent 2,2 Mo pour un usage occasionnel.
+for (const [cle, config] of Object.entries(HABILLAGE)) {
+  if (!config.paresseux) chargerLimites(cle);
+}
 
 // Affiche ou masque une couche d'habillage, étiquettes comprises.
 function basculerHabillage(cle, actif) {
+  if (actif && !habillage[cle].couche) {
+    // Première demande d'une couche paresseuse : on charge, puis on rappelle.
+    chargerLimites(cle).then(() => {
+      if (document.getElementById(HABILLAGE[cle].case).checked) basculerHabillage(cle, true);
+    });
+    return;
+  }
   const { couche, etiquettes } = habillage[cle];
   if (!couche) return;
   if (actif) couche.addTo(map); else map.removeLayer(couche);
@@ -518,6 +620,7 @@ function changerFond(nom) {
   for (const [cle, config] of Object.entries(HABILLAGE)) {
     if (habillage[cle].couche) habillage[cle].couche.setStyle(config.style[nom]);
   }
+  majLabels();
 }
 
 document.getElementById("btn-standard").addEventListener("click", () => changerFond("standard"));
@@ -793,11 +896,17 @@ function construireControles() {
     rafraichirCarte();
   });
 
-  const casesHabillage = { "case-territoires": "territoires", "case-zones-sante": "zonesSante" };
+  const casesHabillage = {
+    "case-territoires": "territoires",
+    "case-zones-sante": "zonesSante",
+    "case-secteurs": "secteurs",
+    "case-groupements": "groupements",
+  };
   for (const [id, cle] of Object.entries(casesHabillage)) {
     document.getElementById(id).addEventListener("change", (evt) => {
       basculerHabillage(cle, evt.target.checked);
       majLabels();
+      construireLegende();
     });
   }
   document.getElementById("case-noms").addEventListener("change", majLabels);
@@ -881,6 +990,15 @@ function construireLegende() {
   html += `<div><span class="legend-ligne"></span>Province</div>`;
   html += `<div><span class="legend-ligne tiret"></span>Territoire</div>`;
   html += `<div><span class="legend-ligne pointille"></span>Zone de santé</div>`;
+  if (document.getElementById("case-secteurs").checked) {
+    html += `<div><span class="legend-ligne tiret" style="background:#fbbf24"></span>` +
+            `Secteur / chefferie <span style="opacity:.7">(2010)</span></div>`;
+  }
+  if (document.getElementById("case-groupements").checked) {
+    html += `<div><span class="legend-dot" style="background:#f59e0b;` +
+            `box-shadow:0 0 0 1px #fde68a"></span>` +
+            `Chef-lieu de groupement <span style="opacity:.7">(2009)</span></div>`;
+  }
   legende.innerHTML = html;
 }
 
@@ -890,18 +1008,31 @@ const LABEL_ZOOM = 13;              // noms de villages : à partir de ce zoom
 const PROVINCE_LABEL_ZOOM_MAX = 7;      // noms de provinces : jusqu'à ce zoom
 const TERRITOIRE_LABEL_ZOOM = [8, 10];  // noms de territoires : entre ces zooms
 const ZONE_SANTE_LABEL_ZOOM = [11, 12]; // noms de zones de santé : entre ces zooms
+// Les couches coutumières sont facultatives et ne s'affichent que si l'on a
+// coché leur case. Leurs plages s'intercalent entre celles déjà en place :
+// secteurs juste après les territoires, groupements avec les villages. La
+// couleur les distingue de toute façon — blanc pour l'administratif, vert pour
+// le sanitaire, ambre pour le coutumier.
+const SECTEUR_LABEL_ZOOM = [9, 11];      // noms de secteurs et chefferies
+const GROUPEMENT_LABEL_ZOOM = [13, 15];  // noms de chefs-lieux de groupements
+
 function majLabels() {
   const z = map.getZoom();
   const c = map.getContainer();
-  const nomsActifs = document.getElementById("case-noms").checked;
-  const territoiresActifs = document.getElementById("case-territoires").checked;
-  const zonesActives = document.getElementById("case-zones-sante").checked;
-  c.classList.toggle("montrer-labels", nomsActifs && z >= LABEL_ZOOM);
+  const coche = (id) => {
+    const element = document.getElementById(id);
+    return !!element && element.checked;
+  };
+  c.classList.toggle("montrer-labels", coche("case-noms") && z >= LABEL_ZOOM);
   c.classList.toggle("montrer-provinces", z <= PROVINCE_LABEL_ZOOM_MAX);
   c.classList.toggle("montrer-territoires",
-    territoiresActifs && z >= TERRITOIRE_LABEL_ZOOM[0] && z <= TERRITOIRE_LABEL_ZOOM[1]);
+    coche("case-territoires") && z >= TERRITOIRE_LABEL_ZOOM[0] && z <= TERRITOIRE_LABEL_ZOOM[1]);
   c.classList.toggle("montrer-zones-sante",
-    zonesActives && z >= ZONE_SANTE_LABEL_ZOOM[0] && z <= ZONE_SANTE_LABEL_ZOOM[1]);
+    coche("case-zones-sante") && z >= ZONE_SANTE_LABEL_ZOOM[0] && z <= ZONE_SANTE_LABEL_ZOOM[1]);
+  c.classList.toggle("montrer-secteurs",
+    coche("case-secteurs") && z >= SECTEUR_LABEL_ZOOM[0] && z <= SECTEUR_LABEL_ZOOM[1]);
+  c.classList.toggle("montrer-groupements",
+    coche("case-groupements") && z >= GROUPEMENT_LABEL_ZOOM[0] && z <= GROUPEMENT_LABEL_ZOOM[1]);
 }
 map.on("zoomend", majLabels);
 

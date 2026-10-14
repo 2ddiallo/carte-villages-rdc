@@ -1,143 +1,143 @@
 #!/usr/bin/env python3
 """
-Télécharge les limites des zones de santé et les prépare pour la carte.
+Télécharge les limites des zones de santé (GRID3) et les prépare pour la carte.
 
 Usage :
-    python3 scripts/moissonner_zones_sante.py
-    python3 scripts/moissonner_zones_sante.py --tolerance 0.002
+    python3 scripts/moissonner_zones_sante.py                 # les 26 provinces
     python3 scripts/moissonner_zones_sante.py --provinces Ituri Nord-Kivu
+    python3 scripts/moissonner_zones_sante.py --archive /chemin/vers/archive.zip
 
-Source : GRID3 COD – Health Zones v8.0 (janvier 2026), même millésime que le
-référentiel des localités utilisé par moissonner_grid3.py. Le champ
-« zonesante » y porte exactement les mêmes valeurs : le filtre de la carte et
-les limites affichées désignent donc bien les mêmes entités.
-Licence CC BY 4.0 — l'attribution est obligatoire.
-519 zones de santé en RDC, 115 sur les 4 provinces suivies.
+Source : GRID3 COD – Health Zones v8.0 (janvier 2026), CC BY 4.0.
+519 zones de santé en RDC — la carte sanitaire officielle du Ministère de la
+Santé, le même découpage que celui publié par OCHA.
 
-Les polygones source sont très détaillés (jusqu'à ~7 300 points pour une seule
-zone). Ils sont simplifiés (Douglas-Peucker) et leurs coordonnées arrondies,
-sans quoi le fichier dépasserait plusieurs mégaoctets. La simplification est
-purement visuelle : ces contours ne sont pas une référence sanitaire ou
-juridique.
+⚠ Changement de source (septembre 2026), comme pour moissonner_grid3.py : le
+service ArcGIS de GRID3 est devenu privé (« Token Required »). Le jeu v8.0
+reste publié en accès libre sur HDX sous forme d'une archive de GeoPackage,
+un par province — c'est elle qui est utilisée ici. Voir `lire_geopackage.py`
+pour la lecture sans dépendance.
 
-La routine de simplification est celle de preparer_limites.py, importée pour
-éviter d'en tenir deux copies.
+Les polygones source sont énormes (plus d'un million de points au total,
+jusqu'à ~7 300 pour une seule zone). Ils sont simplifiés plus fortement que les
+limites administratives : ces contours ne servent qu'à situer.
 """
 
 import argparse
 import json
+import shutil
 import sys
-import time
+import tempfile
 import unicodedata
 import urllib.error
-import urllib.parse
 import urllib.request
+import zipfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from lire_geopackage import lire  # noqa: E402
+from moissonner_grid3 import PROVINCES_RDC, cle_province  # noqa: E402
 from preparer_limites import compter_points, simplifier_geometrie  # noqa: E402
 
-SERVICE = (
-    "https://services3.arcgis.com/BU6Aadhn6tbBEdyk/arcgis/rest/services/"
-    "GRID3_COD_health_zones_v8_0/FeatureServer/0"
+# Archive « GRID3_COD_v8_province_health_zones.zip » du jeu HDX
+# « grid3-cod-health-zones-v8-0 » : 26 GeoPackage, 46 Mo.
+ARCHIVE_HDX = (
+    "https://data.humdata.org/dataset/21bee45b-081e-4029-befa-29f7936612dd/"
+    "resource/971c7a38-dbf8-4742-b7fd-94c5c0d41d2e/download/"
+    "grid3_cod_v8_province_health_zones.zip"
 )
 
-PROVINCES_DEFAUT = ["Ituri", "Nord-Kivu", "Sud-Kivu", "Tanganyika"]
 RACINE = Path(__file__).resolve().parent.parent
 
 # Plus grossier que pour les limites administratives (0,002°) : les contours
 # sanitaires ne servent qu'à situer, et le gain de poids est décisif ici.
 TOLERANCE_DEFAUT = 0.003
 
-TAILLE_PAGE = 200  # polygones lourds : pages plus petites que pour les points
+CHAMPS = ["province", "zonesante", "antenne", "date", "source_acronym"]
 
 
-def slug(texte: str) -> str:
-    sans_accent = unicodedata.normalize("NFKD", texte).encode("ascii", "ignore").decode()
-    return sans_accent.lower().replace(" ", "-")
+def telecharger_archive(destination: Path) -> Path:
+    print("Téléchargement de l'archive des zones de santé depuis HDX (~46 Mo)…")
+    try:
+        with urllib.request.urlopen(ARCHIVE_HDX, timeout=600) as reponse, \
+                open(destination, "wb") as fichier:
+            shutil.copyfileobj(reponse, fichier)
+    except (urllib.error.URLError, TimeoutError) as erreur:
+        sys.exit(
+            f"Échec du téléchargement : {erreur}\n"
+            "Si le lien a changé, retrouver la ressource « province health zones » sur\n"
+            "https://data.humdata.org/dataset/grid3-cod-health-zones-v8-0"
+        )
+    print(f"    {destination.stat().st_size / 1_048_576:.1f} Mo téléchargés\n")
+    return destination
 
 
-def interroger(params: dict, tentatives: int = 3) -> dict:
-    url = f"{SERVICE}/query?{urllib.parse.urlencode(params)}"
-    for essai in range(1, tentatives + 1):
-        try:
-            with urllib.request.urlopen(url, timeout=180) as reponse:
-                donnees = json.loads(reponse.read().decode("utf-8"))
-            if "error" in donnees:
-                sys.exit(f"Erreur du service GRID3 : {donnees['error'].get('message')}")
-            return donnees
-        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as erreur:
-            if essai == tentatives:
-                sys.exit(f"Échec de la requête après {tentatives} tentatives : {erreur}")
-            print(f"    (tentative {essai} échouée : {erreur} — nouvel essai)")
-            time.sleep(2 * essai)
-    return {}
-
-
-def moissonner(provinces: list) -> list:
-    """Télécharge les zones de santé des provinces demandées, page par page."""
-    liste = ",".join(f"'{p}'" for p in provinces)
-    features = []
-    offset = 0
-    while True:
-        reponse = interroger({
-            "where": f"province IN ({liste})",
-            "outFields": "province,zonesante,antenne,date,source_acronym",
-            "orderByFields": "OBJECTID",
-            "resultOffset": offset,
-            "resultRecordCount": TAILLE_PAGE,
-            "f": "geojson",
-        })
-        page = reponse.get("features", [])
-        if not page:
-            break
-        features.extend(page)
-        print(f"    {len(features)} zones téléchargées…", end="\r", flush=True)
-        if len(page) < TAILLE_PAGE:
-            break
-        offset += TAILLE_PAGE
-    print(" " * 50, end="\r")
-    return features
+def extraire(archive: Path, dossier: Path) -> dict:
+    """Extrait les GeoPackage. Renvoie {clé de province: chemin}."""
+    with zipfile.ZipFile(archive) as zip_archive:
+        zip_archive.extractall(dossier)
+    fichiers = {}
+    for chemin in dossier.rglob("*.gpkg"):
+        milieu = chemin.stem.removeprefix("GRID3_COD_").removesuffix("_health_zones_v8_0")
+        fichiers[cle_province(milieu)] = chemin
+    if not fichiers:
+        sys.exit(f"Aucun GeoPackage trouvé dans {archive.name} — archive inattendue ?")
+    return fichiers
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Télécharge les limites des zones de santé (GRID3) pour la carte."
+        description="Prépare les limites des zones de santé (GRID3) pour la carte."
     )
-    parser.add_argument("--provinces", nargs="+", default=PROVINCES_DEFAUT,
-                        help=f"Provinces à moissonner (défaut : {' '.join(PROVINCES_DEFAUT)})")
+    parser.add_argument("--provinces", nargs="+", default=PROVINCES_RDC,
+                        help="Provinces à retenir (défaut : les 26)")
     parser.add_argument("--tolerance", type=float, default=TOLERANCE_DEFAUT,
                         help=f"Tolérance de simplification en degrés (défaut : {TOLERANCE_DEFAUT})")
+    parser.add_argument("--archive", type=Path, default=None,
+                        help="Archive HDX déjà téléchargée (évite de la reprendre)")
     args = parser.parse_args()
 
-    print("Source : GRID3 COD – Health Zones v8.0 (CC BY 4.0)")
+    print("Source : GRID3 COD – Health Zones v8.0, via HDX (CC BY 4.0)")
     print(f"Tolérance de simplification : {args.tolerance}° (≈ {args.tolerance * 111000:.0f} m)\n")
 
-    features = moissonner(args.provinces)
-    if not features:
-        raise SystemExit(
-            f"Aucune zone de santé trouvée pour : {', '.join(args.provinces)}\n"
-            "Vérifier l'orthographe des noms de provinces."
-        )
+    with tempfile.TemporaryDirectory() as temporaire:
+        dossier = Path(temporaire)
+        archive = args.archive or telecharger_archive(dossier / "health_zones.zip")
+        fichiers = extraire(archive, dossier / "gpkg")
 
-    points_avant = sum(compter_points(f["geometry"]) for f in features)
-    zones = []
-    ignorees = 0
-    for feature in features:
-        geometrie = simplifier_geometrie(feature["geometry"], args.tolerance)
-        if not geometrie:
-            ignorees += 1
-            continue
-        proprietes = feature["properties"]
-        zones.append({
-            "type": "Feature",
-            "geometry": geometrie,
-            "properties": {
-                "nom": proprietes["zonesante"],
-                "province": proprietes["province"],
-                "antenne": proprietes.get("antenne"),
-            },
-        })
+        inconnues = [p for p in args.provinces if cle_province(p) not in fichiers]
+        if inconnues:
+            sys.exit(f"Provinces absentes de l'archive : {', '.join(inconnues)}")
+
+        zones = []
+        points_avant = 0
+        ignorees = 0
+        par_province = {}
+
+        for province in args.provinces:
+            for ligne in lire(fichiers[cle_province(province)], CHAMPS):
+                brute = ligne.get("geometrie")
+                if not brute:
+                    ignorees += 1
+                    continue
+                points_avant += compter_points(brute)
+                geometrie = simplifier_geometrie(brute, args.tolerance)
+                if not geometrie:
+                    ignorees += 1
+                    continue
+                zones.append({
+                    "type": "Feature",
+                    "geometry": geometrie,
+                    "properties": {
+                        "nom": ligne.get("zonesante"),
+                        "province": ligne.get("province") or province,
+                        "antenne": ligne.get("antenne"),
+                    },
+                })
+                par_province[province] = par_province.get(province, 0) + 1
+            print(f"    {province:<16} {par_province.get(province, 0):>3} zones", flush=True)
+
+    if not zones:
+        sys.exit("Aucune zone de santé retenue — vérifier les noms de provinces.")
 
     chemin = RACINE / "data" / "zones_sante.geojson"
     chemin.parent.mkdir(parents=True, exist_ok=True)
@@ -145,22 +145,15 @@ def main() -> None:
         json.dump({"type": "FeatureCollection", "features": zones},
                   fichier, ensure_ascii=False, separators=(",", ":"))
 
-    points_apres = sum(compter_points(f["geometry"]) for f in zones)
+    points_apres = sum(compter_points(z["geometry"]) for z in zones)
     reduction = 100 * (1 - points_apres / points_avant) if points_avant else 0
-    taille_mo = chemin.stat().st_size / 1_048_576
 
-    print(f"zones téléchargées : {len(features)}")
+    print()
+    print(f"zones retenues : {len(zones)}")
     if ignorees:
-        print(f"zones ignorées     : {ignorees} (contour dégénéré après simplification)")
-    print(f"points             : {points_avant} → {points_apres} (−{reduction:.0f} %)")
-    print(f"fichier            : {chemin.name} ({taille_mo:.2f} Mo)\n")
-
-    par_province = {}
-    for zone in zones:
-        par_province[zone["properties"]["province"]] = par_province.get(
-            zone["properties"]["province"], 0) + 1
-    for province in args.provinces:
-        print(f"  {province:<12} {par_province.get(province, 0):>3} zones de santé")
+        print(f"zones ignorées : {ignorees} (contour vide ou dégénéré après simplification)")
+    print(f"points         : {points_avant} → {points_apres} (−{reduction:.0f} %)")
+    print(f"fichier        : {chemin.name} ({chemin.stat().st_size / 1_048_576:.2f} Mo)")
 
 
 if __name__ == "__main__":

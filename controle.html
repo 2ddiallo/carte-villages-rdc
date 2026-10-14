@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Contrôle des ajouts de villages — RDC</title>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"
+      integrity="sha512-h9FcoyWjHcOcmEVkxOfTLnmZFWIH0iZhZT1H2TbOq55xssQGEJHEaIm+PgoUaZbRvQTNTluNOEfb1ZRy6D3BOw=="
+      crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+<style>
+/* ------------------------------------------------------------------ *
+ * Console de contrôle — page locale, non publiée.
+ * ------------------------------------------------------------------ */
+:root {
+  --fond: #f6f7f9; --carte: #ffffff; --texte: #16181d; --gris: #6b7280;
+  --trait: #e2e5ea; --accent: #1d4ed8;
+  --vert: #15803d; --vert-fond: #ecfdf3;
+  --orange: #b45309; --orange-fond: #fffbeb;
+  --rouge: #b91c1c; --rouge-fond: #fef2f2;
+  --base: #ea580c; --grid3: #2563eb;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fond: #0f1115; --carte: #171a20; --texte: #e8eaed; --gris: #9aa0a6;
+    --trait: #282c34; --accent: #60a5fa;
+    --vert: #4ade80; --vert-fond: #10251a;
+    --orange: #fbbf24; --orange-fond: #2a2109;
+    --rouge: #f87171; --rouge-fond: #2a1416;
+    --base: #fb923c; --grid3: #60a5fa;
+  }
+}
+* { box-sizing: border-box; }
+/* Les éléments masqués le sont par `hidden` ; sans cette règle, un
+   `display: flex` posé par ailleurs l'emporterait silencieusement. */
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body {
+  margin: 0; background: var(--fond); color: var(--texte);
+  font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  display: flex; flex-direction: column;
+}
+
+/* --- Bandeau ------------------------------------------------------- */
+header {
+  display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+  padding: .6rem 1rem; background: var(--carte);
+  border-bottom: 1px solid var(--trait);
+}
+header h1 { font-size: 1rem; margin: 0; font-weight: 650; white-space: nowrap; }
+header .confidentiel {
+  font-size: 12px; color: var(--gris); border-left: 1px solid var(--trait);
+  padding-left: 1rem;
+}
+header .espace { flex: 1; }
+
+.compteurs { display: flex; gap: .4rem; }
+.compteur {
+  border: 1px solid var(--trait); border-radius: 6px; background: var(--fond);
+  padding: .2rem .55rem; font-size: 12.5px; cursor: pointer; color: var(--texte);
+  display: flex; align-items: center; gap: .35rem;
+}
+.compteur[aria-pressed="true"] { border-color: currentColor; font-weight: 650; }
+.compteur.vert { color: var(--vert); }
+.compteur.orange { color: var(--orange); }
+.compteur.rouge { color: var(--rouge); }
+.compteur.tous { color: var(--texte); }
+
+button, .bouton {
+  font: inherit; border: 1px solid var(--trait); background: var(--carte);
+  color: var(--texte); border-radius: 6px; padding: .32rem .7rem; cursor: pointer;
+}
+button:hover:not(:disabled) { border-color: var(--accent); }
+button:disabled { opacity: .45; cursor: default; }
+button.principal { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.danger { color: var(--rouge); }
+
+/* --- Accueil ------------------------------------------------------- */
+#accueil {
+  flex: 1; display: flex; align-items: center; justify-content: center; padding: 2rem;
+}
+#accueil .boite {
+  max-width: 44rem; background: var(--carte); border: 1px solid var(--trait);
+  border-radius: 12px; padding: 2rem 2.25rem;
+}
+#accueil h2 { margin: 0 0 .5rem; font-size: 1.2rem; }
+#accueil p { color: var(--gris); margin: .5rem 0; }
+#depot {
+  margin: 1.5rem 0 .5rem; border: 2px dashed var(--trait); border-radius: 10px;
+  padding: 2rem; text-align: center; cursor: pointer; transition: border-color .15s;
+}
+#depot.survol, #depot:hover { border-color: var(--accent); }
+#depot strong { display: block; margin-bottom: .3rem; }
+#depot span { color: var(--gris); font-size: 13px; }
+.saisie-unitaire { margin-top: 1.5rem; border-top: 1px solid var(--trait); padding-top: 1.25rem; }
+.saisie-unitaire .champs { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: .6rem; }
+input[type="text"] {
+  font: inherit; padding: .35rem .55rem; border: 1px solid var(--trait);
+  border-radius: 6px; background: var(--fond); color: var(--texte);
+}
+#etat-chargement { margin-top: 1rem; font-size: 13px; color: var(--gris); min-height: 1.4em; }
+#etat-chargement.erreur { color: var(--rouge); }
+
+/* --- Cartographie des colonnes ------------------------------------- */
+#colonnes { margin-top: 1.25rem; display: none; }
+#colonnes table { border-collapse: collapse; width: 100%; font-size: 13px; }
+#colonnes td { padding: .25rem .4rem; }
+#colonnes select {
+  font: inherit; padding: .25rem; border: 1px solid var(--trait);
+  border-radius: 5px; background: var(--fond); color: var(--texte); max-width: 16rem;
+}
+
+/* --- Espace de revue ----------------------------------------------- */
+#revue { flex: 1; display: none; min-height: 0; }
+#revue.actif { display: flex; }
+
+#file {
+  width: 21rem; flex: none; background: var(--carte);
+  border-right: 1px solid var(--trait); overflow-y: auto;
+}
+#file .entree {
+  padding: .5rem .75rem; border-bottom: 1px solid var(--trait); cursor: pointer;
+  border-left: 3px solid transparent;
+}
+#file .entree:hover { background: var(--fond); }
+#file .entree[aria-current="true"] { background: var(--fond); border-left-color: var(--accent); }
+#file .entree .nom { font-weight: 600; }
+#file .entree .meta { font-size: 12px; color: var(--gris); }
+#file .entree.vert .nom { color: var(--vert); }
+#file .entree.orange .nom { color: var(--orange); }
+#file .entree.rouge .nom { color: var(--rouge); }
+#file .entree .decidee {
+  font-size: 11px; text-transform: uppercase; letter-spacing: .03em;
+  color: var(--gris); border: 1px solid var(--trait); border-radius: 4px;
+  padding: 0 .3rem; margin-left: .3rem;
+}
+
+#carte { flex: 1; min-width: 0; }
+
+#detail {
+  width: 25rem; flex: none; background: var(--carte);
+  border-left: 1px solid var(--trait); overflow-y: auto; padding: .9rem 1rem 3rem;
+}
+#detail h2 { font-size: 1.05rem; margin: 0 0 .1rem; }
+#detail .position { font-size: 12.5px; color: var(--gris); margin-bottom: .7rem; }
+.verdict {
+  border-radius: 7px; padding: .5rem .7rem; font-weight: 620; margin-bottom: .8rem;
+  border: 1px solid currentColor;
+}
+.verdict.vert { color: var(--vert); background: var(--vert-fond); }
+.verdict.orange { color: var(--orange); background: var(--orange-fond); }
+.verdict.rouge { color: var(--rouge); background: var(--rouge-fond); }
+
+.drapeau {
+  border-left: 3px solid var(--trait); padding: .35rem 0 .35rem .6rem;
+  margin-bottom: .55rem; font-size: 13px;
+}
+.drapeau.rouge { border-left-color: var(--rouge); }
+.drapeau.orange { border-left-color: var(--orange); }
+.drapeau.info { border-left-color: var(--gris); }
+.drapeau .code { font-weight: 650; margin-right: .3rem; }
+.drapeau .intitule { color: var(--gris); font-size: 12px; display: block; }
+
+#detail h3 {
+  font-size: 12px; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--gris); margin: 1.2rem 0 .4rem; font-weight: 650;
+}
+table.voisins { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+table.voisins th {
+  text-align: left; color: var(--gris); font-weight: 600; padding: .2rem .3rem;
+  border-bottom: 1px solid var(--trait);
+}
+table.voisins td { padding: .3rem .3rem; border-bottom: 1px solid var(--trait); vertical-align: top; }
+table.voisins tr.survol td { background: var(--fond); }
+table.voisins .pastille {
+  display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: .3rem;
+}
+table.voisins .grid3 { background: var(--grid3); }
+table.voisins .base { background: var(--base); }
+table.voisins code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .92em; }
+table.voisins .note { color: var(--gris); }
+
+.decisions { margin-top: 1.4rem; border-top: 1px solid var(--trait); padding-top: .9rem; }
+.decisions .rangee { display: flex; gap: .4rem; flex-wrap: wrap; margin-bottom: .5rem; }
+.decisions .rangee button { flex: 1; min-width: 7rem; }
+.decisions .prise {
+  font-size: 12.5px; color: var(--gris); background: var(--fond);
+  border: 1px solid var(--trait); border-radius: 6px; padding: .4rem .55rem;
+}
+.leaflet-container { background: #0b0d10; }
+.etiquette-voisin {
+  background: rgba(0,0,0,.66); color: #fff; border: 0; box-shadow: none;
+  border-radius: 3px; padding: 1px 4px; font-size: 11px; white-space: nowrap;
+}
+.etiquette-voisin::before { display: none; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Contrôle des ajouts de villages</h1>
+  <span class="confidentiel">
+    Traitement local — le fichier déposé ne quitte pas cet ordinateur
+  </span>
+  <span class="espace"></span>
+  <div class="compteurs" id="compteurs" hidden>
+    <button class="compteur tous" data-filtre="tous" aria-pressed="true">Tous <b>0</b></button>
+    <button class="compteur rouge" data-filtre="rouge" aria-pressed="false">Doublon / invalide <b>0</b></button>
+    <button class="compteur orange" data-filtre="orange" aria-pressed="false">À vérifier <b>0</b></button>
+    <button class="compteur vert" data-filtre="vert" aria-pressed="false">Nouveau <b>0</b></button>
+  </div>
+  <button id="exporter" hidden>Exporter les décisions</button>
+  <button id="recommencer" hidden>Nouveau lot</button>
+</header>
+
+<section id="accueil">
+  <div class="boite">
+    <h2>Vérifier des villages avant de les ajouter à la base</h2>
+    <p>
+      Chaque village proposé est confronté au référentiel GRID3 (127 942 localités,
+      les 26 provinces), à la base interne actuelle et aux limites administratives.
+      Huit contrôles cherchent les coordonnées douteuses et les doublons cachés
+      derrière une autre graphie. Le verdict trie la file&nbsp;; la décision reste
+      la vôtre.
+    </p>
+
+    <div id="depot" tabindex="0" role="button">
+      <strong>Déposer l'export à contrôler</strong>
+      <span>.xlsx, .xls ou .csv — ou cliquer pour choisir un fichier</span>
+    </div>
+    <input type="file" id="fichier" accept=".xlsx,.xls,.csv" hidden />
+
+    <div id="colonnes">
+      <h3 style="font-size:13px;margin:.2rem 0 .4rem">Colonnes détectées</h3>
+      <table id="table-colonnes"></table>
+      <div style="margin-top:.7rem;display:flex;gap:.5rem">
+        <button class="principal" id="lancer">Lancer le contrôle</button>
+        <button id="annuler-colonnes">Annuler</button>
+      </div>
+    </div>
+
+    <div class="saisie-unitaire">
+      <strong style="font-size:13px">Une seule demande&nbsp;?</strong>
+      <div class="champs">
+        <input type="text" id="unitaire-nom" placeholder="Nom du village" size="18" />
+        <input type="text" id="unitaire-coord" placeholder="-1.1833, 29.45" size="18" />
+        <input type="text" id="unitaire-province" placeholder="Province (facultatif)" size="16" />
+        <button id="unitaire-lancer">Contrôler</button>
+      </div>
+    </div>
+
+    <div style="margin-top:1.25rem;border-top:1px solid var(--trait);padding-top:1rem">
+      <strong style="font-size:13px">Mémoire des décisions</strong>
+      <p style="margin:.3rem 0 .5rem">
+        Charger un <code>decisions.csv</code> d'une session précédente&nbsp;: un village
+        déjà arbitré sera signalé s'il revient (contrôle C8).
+      </p>
+      <input type="file" id="fichier-decisions" accept=".csv" />
+      <span id="etat-decisions" style="font-size:12.5px;color:var(--gris)"></span>
+    </div>
+
+    <div id="etat-chargement"></div>
+  </div>
+</section>
+
+<section id="revue">
+  <div id="file"></div>
+  <div id="carte"></div>
+  <div id="detail"></div>
+</section>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"
+        integrity="sha512-puJW3E/qXDqYp9IfhAI54BJEaWIfloJ7JWs7OeD5i6ruC9JZL1gERT1wjtwXFlh7CjE7ZJ+/vcRZRkIYIb6p4g=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"
+        integrity="sha512-r22gChDnGvBylk90+2e/ycr3RVrDi8DIOkIGNhJlKfuyQM4tIRAI062MaV8sfjQKYVGjOBaZBOA87z+IhZE9DA=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="js/noms.js"></script>
+<script src="js/controle.js"></script>
+<script>
+(function () {
+"use strict";
+
+/* ==================================================================== *
+ * Réglages
+ * ==================================================================== */
+
+const CONFIG = {
+  // Colonnes reconnues automatiquement. Mêmes listes que
+  // scripts/convertir_villages.py, pour que les deux outils lisent
+  // les mêmes exports sans réglage.
+  colonnes: {
+    lat: ["lat", "latitude", "y"],
+    lon: ["lon", "lng", "long", "longitude", "x"],
+    nom: ["nom", "village", "name", "nom_village"],
+    province: ["province", "prov"],
+    territoire: ["territory", "territoire", "terr"],
+  },
+  // Marge autour de l'emprise d'une province pour décider de la charger :
+  // un village proposé près d'une limite doit être comparé aux localités
+  // de l'autre côté, sinon on croit à tort qu'il n'a aucun voisin.
+  margeProvinceDegres: 0.1,
+  zoomCandidat: 16,
+  baseInterne: "data/villages.geojson",
+};
+
+/* ==================================================================== *
+ * État
+ * ==================================================================== */
+
+const etat = {
+  referentiel: null,
+  provincesChargees: new Set(),
+  lot: [],              // { candidat, resultat, decision }
+  selection: -1,
+  filtre: "tous",
+  nomLot: "",
+  decisionsChargees: [],
+};
+
+const $ = (selecteur) => document.querySelector(selecteur);
+const echapper = (v) => String(v === null || v === undefined ? "" : v)
+  .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+function informer(message, erreur) {
+  const zone = $("#etat-chargement");
+  zone.textContent = message || "";
+  zone.className = erreur ? "erreur" : "";
+}
+
+/* ==================================================================== *
+ * Chargement du référentiel
+ * ==================================================================== */
+
+async function lireJson(url) {
+  const reponse = await fetch(url, { cache: "no-cache" });
+  if (!reponse.ok) throw new Error(`${url} : ${reponse.status}`);
+  return reponse.json();
+}
+
+let indexProvinces = null;
+
+async function preparerReferentiel() {
+  if (etat.referentiel) return etat.referentiel;
+
+  informer("Chargement des limites administratives…");
+  const referentiel = new Controle.Referentiel();
+  const [index, provinces, territoires] = await Promise.all([
+    lireJson("ref/index.json"),
+    lireJson("data/provinces.geojson"),
+    lireJson("data/territoires.geojson"),
+  ]);
+  indexProvinces = index.provinces;
+  referentiel.ajouterLimites("provinces", provinces);
+  referentiel.ajouterLimites("territoires", territoires);
+
+  informer("Chargement de la base interne…");
+  try {
+    referentiel.ajouterBaseInterne(await lireJson(CONFIG.baseInterne));
+  } catch (erreur) {
+    // La base interne est facultative : sans elle, le contrôle se fait
+    // contre GRID3 seul. Mieux vaut le dire que l'ignorer.
+    console.warn("Base interne non chargée :", erreur);
+    informer("Base interne absente — contrôle contre GRID3 seul.", true);
+  }
+
+  if (etat.decisionsChargees.length) referentiel.ajouterDecisions(etat.decisionsChargees);
+  etat.referentiel = referentiel;
+  return referentiel;
+}
+
+/** Charge les provinces dont l'emprise, élargie, couvre l'un des candidats. */
+async function chargerProvincesUtiles(candidats) {
+  const marge = CONFIG.margeProvinceDegres;
+  const aCharger = indexProvinces.filter((province) => {
+    if (etat.provincesChargees.has(province.province)) return false;
+    const [xmin, ymin, xmax, ymax] = province.bbox;
+    return candidats.some((c) =>
+      Number.isFinite(c.lat) && Number.isFinite(c.lon) &&
+      c.lon >= xmin - marge && c.lon <= xmax + marge &&
+      c.lat >= ymin - marge && c.lat <= ymax + marge);
+  });
+
+  let fait = 0;
+  for (const province of aCharger) {
+    informer(`Référentiel GRID3 — ${province.province} (${++fait}/${aCharger.length})…`);
+    etat.referentiel.ajouterProvinceGrid3(await lireJson(province.fichier));
+    etat.provincesChargees.add(province.province);
+  }
+  return aCharger.map((p) => p.province);
+}
+
+/* ==================================================================== *
+ * Lecture du fichier déposé
+ * ==================================================================== */
+
+let lignesBrutes = null;
+let enTetes = null;
+
+/*
+ * Options de lecture, valables pour Excel comme pour CSV. Chacune corrige un
+ * comportement par défaut qui abîme les données :
+ *
+ *   codepage 65001  — sans lui, un CSV est lu en windows-1252 et « déjà »
+ *                     devient « dÃ©jÃ  ». Les .xlsx sont toujours en UTF-8 en
+ *                     interne : l'option est sans effet sur eux. Un vieux CSV
+ *                     réellement encodé en latin-1 doit donc être réenregistré
+ *                     en UTF-8 (ou en .xlsx) avant d'être déposé.
+ *   cellDates+dateNF — une colonne de dates ISO est reconnue comme date puis
+ *                     réaffichée au format court américain (« 2026-09-08 »
+ *                     devenait « 9/8/26 »). On impose le format ISO.
+ *
+ * Les colonnes de coordonnées, elles, restent rendues telles qu'écrites : le
+ * contrôle C3 compte leurs décimales, information perdue dès la conversion en
+ * nombre.
+ */
+const OPTIONS_LECTURE = {
+  type: "array", codepage: 65001, cellDates: true, dateNF: "yyyy-mm-dd",
+};
+
+function lireClasseur(fichier) {
+  return new Promise((resoudre, rejeter) => {
+    const lecteur = new FileReader();
+    lecteur.onerror = () => rejeter(new Error("Lecture du fichier impossible."));
+    lecteur.onload = () => {
+      try {
+        const classeur = XLSX.read(lecteur.result, OPTIONS_LECTURE);
+        const feuille = classeur.Sheets[classeur.SheetNames[0]];
+        // defval:"" garde les colonnes vides, raw:false rend les nombres tels
+        // qu'écrits : c'est ainsi qu'on lit le nombre de décimales (contrôle C3).
+        resoudre(XLSX.utils.sheet_to_json(feuille, { defval: "", raw: false }));
+      } catch (erreur) {
+        rejeter(erreur);
+      }
+    };
+    lecteur.readAsArrayBuffer(fichier);
+  });
+}
+
+function detecter(colonnes, candidats) {
+  const parMinuscule = new Map(colonnes.map((c) => [String(c).trim().toLowerCase(), c]));
+  for (const candidat of candidats) {
+    if (parMinuscule.has(candidat)) return parMinuscule.get(candidat);
+  }
+  return "";
+}
+
+function afficherCorrespondance() {
+  const roles = [
+    ["lat", "Latitude", true],
+    ["lon", "Longitude", true],
+    ["nom", "Nom du village", true],
+    ["province", "Province", false],
+    ["territoire", "Territoire", false],
+  ];
+  const table = $("#table-colonnes");
+  table.innerHTML = roles.map(([cle, libelle, obligatoire]) => {
+    const detectee = detecter(enTetes, CONFIG.colonnes[cle]);
+    const options = ['<option value="">(aucune)</option>']
+      .concat(enTetes.map((c) =>
+        `<option value="${echapper(c)}"${c === detectee ? " selected" : ""}>${echapper(c)}</option>`))
+      .join("");
+    return `<tr><td>${libelle}${obligatoire ? " *" : ""}</td>` +
+           `<td><select data-role="${cle}">${options}</select></td></tr>`;
+  }).join("");
+  $("#colonnes").style.display = "block";
+  informer(`${lignesBrutes.length} ligne${lignesBrutes.length > 1 ? "s" : ""} lue${lignesBrutes.length > 1 ? "s" : ""}. Vérifiez les colonnes avant de lancer.`);
+}
+
+/** « -1,1833 » et « -1.1833 » donnent le même nombre ; on garde la chaîne. */
+function enNombre(valeur) {
+  if (typeof valeur === "number") return valeur;
+  const texte = String(valeur === null || valeur === undefined ? "" : valeur).trim();
+  if (!texte) return NaN;
+  return parseFloat(texte.replace(",", "."));
+}
+
+function texteNombre(valeur) {
+  return String(valeur === null || valeur === undefined ? "" : valeur).trim().replace(",", ".");
+}
+
+/* ==================================================================== *
+ * Contrôle du lot
+ * ==================================================================== */
+
+async function controlerLot(candidats, nomLot) {
+  await preparerReferentiel();
+  const chargees = await chargerProvincesUtiles(candidats);
+  if (chargees.length) informer(`Provinces chargées : ${chargees.join(", ")}.`);
+
+  etat.nomLot = nomLot;
+  etat.lot = candidats.map((candidat) => ({
+    candidat: candidat,
+    resultat: Controle.controler(candidat, etat.referentiel),
+    decision: null,
+  }));
+
+  demarrerRevue();
+}
+
+/* ==================================================================== *
+ * Carte
+ * ==================================================================== */
+
+let carte = null;
+let coucheContexte = null;
+let coucheCandidat = null;
+let marqueurCandidat = null;
+
+function preparerCarte() {
+  if (carte) return;
+  carte = L.map("carte", { zoomControl: true, preferCanvas: true }).setView([-2.5, 23.5], 5);
+
+  const satellite = L.tileLayer(
+    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    {
+      attribution: "Imagerie &copy; Esri — Localités GRID3 v8.0 (CC BY 4.0) — Limites COD-AB, OCHA",
+      maxZoom: 21, maxNativeZoom: 17,
+    }
+  );
+  const standard = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: "&copy; OpenStreetMap — Localités GRID3 v8.0 (CC BY 4.0) — Limites COD-AB, OCHA",
+    maxZoom: 19,
+  });
+  satellite.addTo(carte);
+  L.control.layers({ "Satellite": satellite, "Standard": standard }, null,
+                   { position: "topright" }).addTo(carte);
+
+  coucheContexte = L.layerGroup().addTo(carte);
+  coucheCandidat = L.layerGroup().addTo(carte);
+}
+
+function dessiner(entree) {
+  preparerCarte();
+  coucheContexte.clearLayers();
+  coucheCandidat.clearLayers();
+
+  const { candidat, resultat } = entree;
+  const position = entree.decision && entree.decision.latRetenue !== undefined
+    ? [entree.decision.latRetenue, entree.decision.lonRetenue]
+    : [candidat.lat, candidat.lon];
+
+  if (!Number.isFinite(position[0]) || !Number.isFinite(position[1])) {
+    carte.setView([-2.5, 23.5], 5);
+    return;
+  }
+
+  // Cercles de référence : 250 m (seuil de doublon) et 2 km (voisinage).
+  L.circle(position, { radius: Controle.SEUILS.doublonM, color: "#ef4444", weight: 1,
+                       dashArray: "4 4", fill: false, interactive: false })
+    .addTo(coucheContexte);
+  L.circle(position, { radius: Controle.SEUILS.voisinageM, color: "#9ca3af", weight: 1,
+                       dashArray: "2 6", fill: false, interactive: false })
+    .addTo(coucheContexte);
+
+  for (let i = 0; i < resultat.voisins.length; i++) {
+    const voisin = resultat.voisins[i];
+    const couleur = voisin.point.source === "base"
+      ? getComputedStyle(document.body).getPropertyValue("--base").trim() || "#ea580c"
+      : getComputedStyle(document.body).getPropertyValue("--grid3").trim() || "#2563eb";
+    const marqueur = L.circleMarker([voisin.point.lat, voisin.point.lon], {
+      radius: 5, color: "#fff", weight: 1.2, fillColor: couleur, fillOpacity: .95,
+    }).addTo(coucheContexte);
+    marqueur.bindTooltip(
+      `${voisin.point.nom || "(sans nom)"} · ${Math.round(voisin.distanceM)} m`,
+      { permanent: true, direction: "right", className: "etiquette-voisin", offset: [6, 0] });
+    marqueur.on("mouseover", () => surlignerVoisin(i, true));
+    marqueur.on("mouseout", () => surlignerVoisin(i, false));
+  }
+
+  // Le candidat est déplaçable : corriger une position fait partie du travail.
+  marqueurCandidat = L.marker(position, {
+    draggable: true,
+    title: "Faire glisser pour corriger la position",
+  }).addTo(coucheCandidat);
+  marqueurCandidat.on("dragend", () => {
+    const point = marqueurCandidat.getLatLng();
+    corrigerPosition(point.lat, point.lng);
+  });
+
+  const points = resultat.voisins.map((v) => [v.point.lat, v.point.lon]).concat([position]);
+  if (points.length > 1) {
+    carte.fitBounds(L.latLngBounds(points).pad(0.25), { maxZoom: CONFIG.zoomCandidat });
+  } else {
+    carte.setView(position, CONFIG.zoomCandidat);
+  }
+}
+
+function surlignerVoisin(indice, actif) {
+  const ligne = document.querySelector(`tr[data-voisin="${indice}"]`);
+  if (ligne) ligne.classList.toggle("survol", actif);
+}
+
+/* ==================================================================== *
+ * File de revue
+ * ==================================================================== */
+
+function demarrerRevue() {
+  $("#accueil").style.display = "none";
+  $("#revue").classList.add("actif");
+  $("#compteurs").hidden = false;
+  $("#exporter").hidden = false;
+  $("#recommencer").hidden = false;
+  preparerCarte();
+  setTimeout(() => carte.invalidateSize(), 0);
+  rafraichirCompteurs();
+  rafraichirFile();
+  const premier = etat.lot.findIndex((e) => e.resultat.verdict === "rouge");
+  selectionner(premier >= 0 ? premier : 0);
+}
+
+function rafraichirCompteurs() {
+  const comptes = { tous: etat.lot.length, vert: 0, orange: 0, rouge: 0 };
+  for (const entree of etat.lot) comptes[entree.resultat.verdict]++;
+  for (const bouton of document.querySelectorAll(".compteur")) {
+    bouton.querySelector("b").textContent = comptes[bouton.dataset.filtre];
+    bouton.setAttribute("aria-pressed", String(bouton.dataset.filtre === etat.filtre));
+  }
+}
+
+function rafraichirFile() {
+  const conteneur = $("#file");
+  conteneur.innerHTML = "";
+  etat.lot.forEach((entree, indice) => {
+    if (etat.filtre !== "tous" && entree.resultat.verdict !== etat.filtre) return;
+    const div = document.createElement("div");
+    div.className = "entree " + entree.resultat.verdict;
+    div.setAttribute("aria-current", String(indice === etat.selection));
+    div.dataset.indice = String(indice);
+    const codes = entree.resultat.drapeaux.map((d) => d.code);
+    div.innerHTML =
+      `<div class="nom">${echapper(entree.candidat.nom || "(sans nom)")}` +
+      (entree.decision ? `<span class="decidee">${echapper(entree.decision.verdict)}</span>` : "") +
+      `</div>` +
+      `<div class="meta">${echapper(entree.candidat.province || entree.resultat.provinceReelle || "—")}` +
+      (codes.length ? ` · ${codes.join(" ")}` : " · aucun signalement") + `</div>`;
+    div.addEventListener("click", () => selectionner(indice));
+    conteneur.appendChild(div);
+  });
+}
+
+function selectionner(indice) {
+  if (indice < 0 || indice >= etat.lot.length) return;
+  etat.selection = indice;
+  for (const div of document.querySelectorAll("#file .entree")) {
+    div.setAttribute("aria-current", String(Number(div.dataset.indice) === indice));
+  }
+  const entree = etat.lot[indice];
+  dessiner(entree);
+  afficherDetail(entree);
+}
+
+/* ==================================================================== *
+ * Panneau de détail
+ * ==================================================================== */
+
+function afficherDetail(entree) {
+  const { candidat, resultat } = entree;
+  const detail = $("#detail");
+  const position = entree.decision && entree.decision.latRetenue !== undefined
+    ? { lat: entree.decision.latRetenue, lon: entree.decision.lonRetenue, corrigee: true }
+    : { lat: candidat.lat, lon: candidat.lon, corrigee: false };
+
+  const morceaux = [];
+  morceaux.push(`<h2>${echapper(candidat.nom || "(sans nom)")}</h2>`);
+  morceaux.push(`<div class="position">` +
+    (Number.isFinite(position.lat)
+      ? `${position.lat.toFixed(5)}, ${position.lon.toFixed(5)}` +
+        (position.corrigee ? " <b>(corrigé)</b>" : "")
+      : "coordonnées illisibles") +
+    (candidat.province ? ` · ${echapper(candidat.province)}` : "") +
+    (candidat.territoire ? ` · ${echapper(candidat.territoire)}` : "") +
+    `</div>`);
+
+  morceaux.push(`<div class="verdict ${resultat.verdict}">${echapper(resultat.libelleVerdict)}</div>`);
+
+  if (resultat.drapeaux.length) {
+    for (const d of resultat.drapeaux) {
+      morceaux.push(
+        `<div class="drapeau ${d.gravite}">` +
+        `<span class="code">${d.code}</span>${echapper(d.message)}` +
+        `<span class="intitule">${echapper(d.intitule)}</span></div>`);
+    }
+  } else {
+    morceaux.push(`<div class="drapeau info">Les huit contrôles passent. ` +
+      `Aucune localité connue à moins de 2 km, coordonnées cohérentes avec ` +
+      `le découpage administratif.<span class="intitule">Rien à signaler</span></div>`);
+  }
+
+  if (resultat.provinceReelle || resultat.territoireReel) {
+    morceaux.push(`<h3>Situation réelle du point</h3>`);
+    morceaux.push(`<div style="font-size:13px">` +
+      `${echapper(resultat.provinceReelle || "hors province")}` +
+      (resultat.territoireReel ? ` — territoire de ${echapper(resultat.territoireReel)}` : "") +
+      `</div>`);
+  }
+
+  morceaux.push(`<h3>Localités connues à moins de 2 km (${resultat.voisins.length})</h3>`);
+  if (resultat.voisins.length) {
+    morceaux.push(`<table class="voisins"><thead><tr>` +
+      `<th>Localité</th><th>Dist.</th><th>Nom comparé</th></tr></thead><tbody>`);
+    resultat.voisins.slice(0, 25).forEach((voisin, indice) => {
+      const c = voisin.comparaison;
+      const details = [];
+      if (voisin.point.type) details.push(echapper(voisin.point.type));
+      if (voisin.point.aireSante) details.push("AS " + echapper(voisin.point.aireSante));
+      if (voisin.point.precision) details.push(`±${Math.round(voisin.point.precision)} m`);
+      morceaux.push(
+        `<tr data-voisin="${indice}">` +
+        `<td><span class="pastille ${voisin.point.source}"></span>` +
+        `${echapper(voisin.point.nom || "(sans nom)")}` +
+        (voisin.point.alt ? `<br><span class="note">alias ${echapper(voisin.point.alt)}</span>` : "") +
+        (details.length ? `<br><span class="note">${details.join(" · ")}</span>` : "") +
+        `</td>` +
+        `<td>${Math.round(voisin.distanceM)} m</td>` +
+        `<td><code>${echapper(c.a.base)}</code><br><code>${echapper(c.b.base)}</code>` +
+        `<br><span class="note">${c.verdict} · ${c.score.toFixed(2)}` +
+        (c.memeCle ? " · même clé" : "") + `</span></td></tr>`);
+    });
+    morceaux.push(`</tbody></table>`);
+    if (resultat.voisins.length > 25) {
+      morceaux.push(`<div class="note" style="font-size:12px;margin-top:.3rem">` +
+        `${resultat.voisins.length - 25} autres non affichées.</div>`);
+    }
+  } else {
+    morceaux.push(`<div style="font-size:13px;color:var(--gris)">Aucune. ` +
+      `C'est le cas de 1 719 villages de l'export CHDC : GRID3 ne connaît pas ` +
+      `tout, l'absence de voisin n'est donc pas une anomalie en soi.</div>`);
+  }
+
+  morceaux.push(construireDecisions(entree));
+  detail.innerHTML = morceaux.join("");
+  detail.scrollTop = 0;
+  brancherDecisions(entree);
+}
+
+function construireDecisions(entree) {
+  const voisins = entree.resultat.voisins.slice(0, 8);
+  const options = voisins.map((v, i) =>
+    `<option value="${i}">${echapper(v.point.nom || "(sans nom)")} — ${Math.round(v.distanceM)} m` +
+    ` (${v.point.source === "base" ? "base interne" : "GRID3"})</option>`).join("");
+
+  return `<div class="decisions">` +
+    (entree.decision
+      ? `<div class="prise">Décision enregistrée&nbsp;: <b>${echapper(entree.decision.verdict)}</b>` +
+        (entree.decision.motif ? ` — ${echapper(entree.decision.motif)}` : "") +
+        (entree.decision.nomRetenu ? `<br>Fusionné avec «&nbsp;${echapper(entree.decision.nomRetenu)}&nbsp;»` : "") +
+        `<br><button data-decision="annuler" style="margin-top:.4rem">Revenir sur cette décision</button></div>`
+      : `<div class="rangee">
+           <button class="principal" data-decision="accepte">Accepter</button>
+           <button class="danger" data-decision="rejete">Rejeter</button>
+         </div>` +
+        (voisins.length
+          ? `<div class="rangee">
+               <select id="voisin-fusion" style="flex:1;min-width:9rem;font:inherit;padding:.3rem;border:1px solid var(--trait);border-radius:6px;background:var(--fond);color:var(--texte)">${options}</select>
+               <button data-decision="fusionne">Fusionner</button>
+             </div>`
+          : "") +
+        `<div class="rangee">
+           <input type="text" id="motif" placeholder="Motif (facultatif, repris dans l'export)" style="flex:1" />
+         </div>
+         <div class="note" style="font-size:12px;color:var(--gris)">
+           Pour corriger la position, faire glisser le repère sur la carte —
+           la décision devient «&nbsp;corrige&nbsp;».
+         </div>`) +
+    `</div>`;
+}
+
+function brancherDecisions(entree) {
+  for (const bouton of document.querySelectorAll("#detail [data-decision]")) {
+    bouton.addEventListener("click", () => {
+      const type = bouton.dataset.decision;
+      if (type === "annuler") {
+        entree.decision = null;
+      } else {
+        const motif = ($("#motif") && $("#motif").value.trim()) || "";
+        const decision = { verdict: type, motif: motif };
+        if (type === "fusionne") {
+          const indice = Number($("#voisin-fusion").value);
+          const voisin = entree.resultat.voisins[indice];
+          decision.nomRetenu = voisin.point.nom;
+          decision.idRetenu = voisin.point.id;
+          decision.latRetenue = voisin.point.lat;
+          decision.lonRetenue = voisin.point.lon;
+          decision.distanceM = Math.round(voisin.distanceM);
+          decision.similarite = voisin.comparaison.score;
+        }
+        entree.decision = decision;
+      }
+      rafraichirFile();
+      afficherDetail(entree);
+      if (entree.decision) avancer();
+    });
+  }
+}
+
+function corrigerPosition(lat, lon) {
+  const entree = etat.lot[etat.selection];
+  if (!entree) return;
+  entree.decision = Object.assign({}, entree.decision, {
+    verdict: "corrige",
+    motif: (entree.decision && entree.decision.motif) || "coordonnées corrigées à la main",
+    latRetenue: lat,
+    lonRetenue: lon,
+  });
+  // La position ayant changé, les contrôles de voisinage ne valent plus :
+  // on rejoue tout sur la nouvelle position plutôt que d'afficher un état mixte.
+  entree.resultat = Controle.controler(
+    Object.assign({}, entree.candidat, { lat: lat, lon: lon, latBrute: String(lat), lonBrute: String(lon) }),
+    etat.referentiel);
+  rafraichirCompteurs();
+  rafraichirFile();
+  dessiner(entree);
+  afficherDetail(entree);
+}
+
+function avancer() {
+  const visibles = Array.from(document.querySelectorAll("#file .entree"))
+    .map((d) => Number(d.dataset.indice));
+  const rang = visibles.indexOf(etat.selection);
+  if (rang >= 0 && rang + 1 < visibles.length) selectionner(visibles[rang + 1]);
+}
+
+/* ==================================================================== *
+ * Export
+ * ==================================================================== */
+
+function champCsv(valeur) {
+  const texte = String(valeur === null || valeur === undefined ? "" : valeur);
+  return /[",;\n]/.test(texte) ? `"${texte.replace(/"/g, '""')}"` : texte;
+}
+
+function exporter() {
+  const aujourdhui = new Date().toISOString().slice(0, 10);
+  const colonnes = [
+    "date", "lot", "nom_propose", "latitude", "longitude", "province", "territoire",
+    "verdict_controle", "drapeaux", "verdict", "motif",
+    "id_retenu", "nom_retenu", "latitude_retenue", "longitude_retenue",
+    "distance_m", "similarite",
+  ];
+  const lignes = [colonnes.join(",")];
+
+  for (const entree of etat.lot) {
+    const d = entree.decision;
+    if (!d) continue;   // seules les décisions prises sont écrites
+    lignes.push([
+      aujourdhui, etat.nomLot,
+      entree.candidat.nom,
+      Number.isFinite(entree.candidat.lat) ? entree.candidat.lat : "",
+      Number.isFinite(entree.candidat.lon) ? entree.candidat.lon : "",
+      entree.candidat.province || "", entree.candidat.territoire || "",
+      entree.resultat.verdict,
+      entree.resultat.drapeaux.map((f) => f.code).join(" "),
+      d.verdict, d.motif || "",
+      d.idRetenu || "", d.nomRetenu || "",
+      d.latRetenue !== undefined ? d.latRetenue : "",
+      d.lonRetenue !== undefined ? d.lonRetenue : "",
+      d.distanceM !== undefined ? d.distanceM : "",
+      d.similarite !== undefined ? d.similarite.toFixed(3) : "",
+    ].map(champCsv).join(","));
+  }
+
+  if (lignes.length === 1) {
+    alert("Aucune décision prise pour l'instant.");
+    return;
+  }
+
+  // BOM : sans lui, Excel lit l'UTF-8 comme du latin-1 et casse les accents.
+  const blob = new Blob(["﻿" + lignes.join("\n")], { type: "text/csv;charset=utf-8" });
+  const lien = document.createElement("a");
+  lien.href = URL.createObjectURL(blob);
+  lien.download = `decisions_${aujourdhui}.csv`;
+  lien.click();
+  URL.revokeObjectURL(lien.href);
+}
+
+/* ==================================================================== *
+ * Lecture d'un decisions.csv existant (contrôle C8)
+ * ==================================================================== */
+
+function lireDecisions(fichier) {
+  const lecteur = new FileReader();
+  lecteur.onload = () => {
+    try {
+      const classeur = XLSX.read(lecteur.result, OPTIONS_LECTURE);
+      const feuille = classeur.Sheets[classeur.SheetNames[0]];
+      const lignes = XLSX.utils.sheet_to_json(feuille, { defval: "", raw: false });
+      etat.decisionsChargees = lignes;
+      if (etat.referentiel) etat.referentiel.ajouterDecisions(lignes);
+      $("#etat-decisions").textContent =
+        `${lignes.length} décision${lignes.length > 1 ? "s" : ""} en mémoire.`;
+    } catch (erreur) {
+      $("#etat-decisions").textContent = "Fichier illisible.";
+    }
+  };
+  lecteur.readAsArrayBuffer(fichier);
+}
+
+/* ==================================================================== *
+ * Branchements
+ * ==================================================================== */
+
+const depot = $("#depot");
+const champFichier = $("#fichier");
+
+depot.addEventListener("click", () => champFichier.click());
+depot.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); champFichier.click(); }
+});
+["dragenter", "dragover"].forEach((type) =>
+  depot.addEventListener(type, (e) => { e.preventDefault(); depot.classList.add("survol"); }));
+["dragleave", "drop"].forEach((type) =>
+  depot.addEventListener(type, (e) => { e.preventDefault(); depot.classList.remove("survol"); }));
+depot.addEventListener("drop", (e) => {
+  if (e.dataTransfer.files.length) accueillirFichier(e.dataTransfer.files[0]);
+});
+champFichier.addEventListener("change", () => {
+  if (champFichier.files.length) accueillirFichier(champFichier.files[0]);
+});
+$("#fichier-decisions").addEventListener("change", (e) => {
+  if (e.target.files.length) lireDecisions(e.target.files[0]);
+});
+
+async function accueillirFichier(fichier) {
+  informer("Lecture du fichier…");
+  try {
+    lignesBrutes = await lireClasseur(fichier);
+  } catch (erreur) {
+    informer("Fichier illisible : " + erreur.message, true);
+    return;
+  }
+  if (!lignesBrutes.length) {
+    informer("Le fichier ne contient aucune ligne.", true);
+    return;
+  }
+  enTetes = Object.keys(lignesBrutes[0]);
+  etat.nomLot = fichier.name;
+  afficherCorrespondance();
+}
+
+$("#annuler-colonnes").addEventListener("click", () => {
+  $("#colonnes").style.display = "none";
+  champFichier.value = "";
+  informer("");
+});
+
+$("#lancer").addEventListener("click", async () => {
+  const choix = {};
+  for (const select of document.querySelectorAll("#table-colonnes select")) {
+    choix[select.dataset.role] = select.value;
+  }
+  if (!choix.lat || !choix.lon || !choix.nom) {
+    informer("Latitude, longitude et nom du village sont indispensables.", true);
+    return;
+  }
+
+  const candidats = lignesBrutes.map((ligne, indice) => ({
+    ligne: indice + 2,          // +2 : l'en-tête, et les lignes comptées à partir de 1
+    nom: String(ligne[choix.nom] || "").trim(),
+    lat: enNombre(ligne[choix.lat]),
+    lon: enNombre(ligne[choix.lon]),
+    latBrute: texteNombre(ligne[choix.lat]),
+    lonBrute: texteNombre(ligne[choix.lon]),
+    province: choix.province ? String(ligne[choix.province] || "").trim() : "",
+    territoire: choix.territoire ? String(ligne[choix.territoire] || "").trim() : "",
+    source: ligne,
+  }));
+
+  $("#lancer").disabled = true;
+  try {
+    await controlerLot(candidats, etat.nomLot);
+  } catch (erreur) {
+    informer("Échec du contrôle : " + erreur.message, true);
+    console.error(erreur);
+  } finally {
+    $("#lancer").disabled = false;
+  }
+});
+
+$("#unitaire-lancer").addEventListener("click", async () => {
+  const nom = $("#unitaire-nom").value.trim();
+  const brut = $("#unitaire-coord").value.trim();
+  if (!nom || !brut) {
+    informer("Il faut au moins un nom et des coordonnées.", true);
+    return;
+  }
+  const morceaux = brut.split(/[;\s]*[,;]\s*|\s+/).filter(Boolean);
+  if (morceaux.length < 2) {
+    informer("Coordonnées attendues sous la forme « -1.1833, 29.45 ».", true);
+    return;
+  }
+  const candidat = {
+    ligne: 1,
+    nom: nom,
+    lat: enNombre(morceaux[0]),
+    lon: enNombre(morceaux[1]),
+    latBrute: texteNombre(morceaux[0]),
+    lonBrute: texteNombre(morceaux[1]),
+    province: $("#unitaire-province").value.trim(),
+    territoire: "",
+    source: {},
+  };
+  try {
+    await controlerLot([candidat], "saisie manuelle");
+  } catch (erreur) {
+    informer("Échec du contrôle : " + erreur.message, true);
+  }
+});
+
+for (const bouton of document.querySelectorAll(".compteur")) {
+  bouton.addEventListener("click", () => {
+    etat.filtre = bouton.dataset.filtre;
+    rafraichirCompteurs();
+    rafraichirFile();
+  });
+}
+
+$("#exporter").addEventListener("click", exporter);
+$("#recommencer").addEventListener("click", () => {
+  const nonDecidees = etat.lot.filter((e) => !e.decision).length;
+  if (nonDecidees && !confirm(
+      `${nonDecidees} village(s) sans décision. Exporter d'abord ? ` +
+      `Cliquer sur Annuler pour revenir en arrière.`)) return;
+  etat.lot = [];
+  etat.selection = -1;
+  etat.filtre = "tous";
+  $("#revue").classList.remove("actif");
+  $("#accueil").style.display = "flex";
+  $("#compteurs").hidden = true;
+  $("#exporter").hidden = true;
+  $("#recommencer").hidden = true;
+  $("#colonnes").style.display = "none";
+  champFichier.value = "";
+  informer("");
+});
+
+// Navigation au clavier dans la file : le contrôle d'un lot est un travail
+// répétitif, la souris n'a pas à en être le seul moyen.
+document.addEventListener("keydown", (e) => {
+  if (!$("#revue").classList.contains("actif")) return;
+  if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
+  if (e.key === "ArrowDown" || e.key === "j") { e.preventDefault(); avancer(); }
+  if (e.key === "ArrowUp" || e.key === "k") {
+    e.preventDefault();
+    const visibles = Array.from(document.querySelectorAll("#file .entree"))
+      .map((d) => Number(d.dataset.indice));
+    const rang = visibles.indexOf(etat.selection);
+    if (rang > 0) selectionner(visibles[rang - 1]);
+  }
+});
+})();
+</script>
+</body>
+</html>

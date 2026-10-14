@@ -27,18 +27,20 @@ import argparse
 import json
 import math
 import shutil
+import sys
 import tempfile
 import unicodedata
 import urllib.request
 import zipfile
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from moissonner_grid3 import PROVINCES_RDC as PROVINCES_DEFAUT  # noqa: E402
+
 ARCHIVE_COD_AB = (
     "https://data.humdata.org/dataset/f42132b9-8cc6-4201-b020-9259c56e8868/"
     "resource/97260e2b-65b1-41e3-aef2-fb0e6874e406/download/cod_admin_boundaries.geojson.zip"
 )
-
-PROVINCES_DEFAUT = ["Ituri", "Nord-Kivu", "Sud-Kivu", "Tanganyika"]
 
 RACINE = Path(__file__).resolve().parent.parent
 
@@ -168,8 +170,7 @@ def main() -> None:
         description="Prépare les limites administratives COD-AB (RDC) pour la carte."
     )
     parser.add_argument("--provinces", nargs="+", default=PROVINCES_DEFAUT,
-                        help="Provinces dont on garde les territoires "
-                             f"(défaut : {' '.join(PROVINCES_DEFAUT)})")
+                        help="Provinces dont on garde les territoires (défaut : les 26)")
     parser.add_argument("--tolerance", type=float, default=TOLERANCE_DEFAUT,
                         help=f"Tolérance de simplification en degrés (défaut : {TOLERANCE_DEFAUT})")
     parser.add_argument("--source", type=Path, default=None,

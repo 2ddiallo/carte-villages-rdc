@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Contrôles — carte des villages RDC</title>
+<style>
+  :root {
+    --fond: #ffffff; --texte: #1a1a1a; --gris: #6b7280; --trait: #e5e7eb;
+    --vert: #15803d; --vert-fond: #f0fdf4; --rouge: #b91c1c; --rouge-fond: #fef2f2;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --fond: #111317; --texte: #e8eaed; --gris: #9aa0a6; --trait: #2a2e35;
+      --vert: #4ade80; --vert-fond: #0f2417; --rouge: #f87171; --rouge-fond: #2a1416;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 2rem 1.25rem 4rem;
+    font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--fond); color: var(--texte);
+  }
+  main { max-width: 60rem; margin: 0 auto; }
+  h1 { font-size: 1.5rem; margin: 0 0 .25rem; }
+  p.chapeau { color: var(--gris); margin: 0 0 2rem; }
+  h2 { font-size: 1.05rem; margin: 2rem 0 .5rem; }
+  #bilan {
+    position: sticky; top: 0; z-index: 2; margin: 0 0 1.5rem;
+    padding: .8rem 1rem; border-radius: 8px; font-weight: 600;
+    background: var(--vert-fond); color: var(--vert); border: 1px solid currentColor;
+  }
+  #bilan.echec { background: var(--rouge-fond); color: var(--rouge); }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+  th, td { text-align: left; padding: .38rem .6rem; border-bottom: 1px solid var(--trait); vertical-align: top; }
+  th { color: var(--gris); font-weight: 600; }
+  td.etat { width: 2.2rem; font-weight: 700; }
+  tr.ko td.etat { color: var(--rouge); }
+  tr.ok td.etat { color: var(--vert); }
+  tr.ko { background: var(--rouge-fond); }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .93em; }
+  .note { color: var(--gris); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Contrôles de <code>js/noms.js</code></h1>
+  <p class="chapeau">
+    Les cas sont décrits dans <code>tests/cas_noms.json</code>. Ils viennent de
+    divergences de graphie réellement observées entre l'export CHDC et le
+    référentiel GRID3. Toute modification des règles de comparaison des noms
+    doit repasser cette page.
+  </p>
+
+  <div id="bilan">Exécution…</div>
+  <div id="resultats"></div>
+</main>
+
+<script src="../js/noms.js"></script>
+<script>
+(async function () {
+  const resultats = document.getElementById("resultats");
+  const bilan = document.getElementById("bilan");
+  let total = 0;
+  let echecs = 0;
+
+  function section(titre, colonnes, lignes) {
+    const bloc = document.createElement("section");
+    const h2 = document.createElement("h2");
+    h2.textContent = titre;
+    bloc.appendChild(h2);
+
+    const table = document.createElement("table");
+    table.innerHTML =
+      "<thead><tr><th></th>" +
+      colonnes.map((c) => `<th>${c}</th>`).join("") +
+      "</tr></thead>";
+    const corps = document.createElement("tbody");
+    for (const ligne of lignes) {
+      total++;
+      if (!ligne.ok) echecs++;
+      const tr = document.createElement("tr");
+      tr.className = ligne.ok ? "ok" : "ko";
+      tr.innerHTML =
+        `<td class="etat">${ligne.ok ? "✓" : "✗"}</td>` +
+        ligne.cellules.map((c) => `<td>${c}</td>`).join("");
+      corps.appendChild(tr);
+    }
+    table.appendChild(corps);
+    bloc.appendChild(table);
+    resultats.appendChild(bloc);
+  }
+
+  const echappe = (v) =>
+    String(v === null || v === undefined ? "∅" : v)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const note = (t) => (t ? `<span class="note">${echappe(t)}</span>` : "");
+
+  let cas;
+  try {
+    cas = await (await fetch("cas_noms.json", { cache: "no-cache" })).json();
+  } catch (erreur) {
+    bilan.className = "echec";
+    bilan.textContent =
+      "Impossible de lire cas_noms.json — cette page doit être servie par " +
+      "un serveur local (python3 -m http.server 8137), pas ouverte par double-clic.";
+    return;
+  }
+
+  /* --- normaliser --------------------------------------------------- */
+  section("normaliser", ["entrée", "obtenu", "attendu", "pourquoi"],
+    cas.normaliser.map((c) => {
+      const obtenu = Noms.normaliser(c.entree);
+      return {
+        ok: obtenu === c.attendu,
+        cellules: [`<code>${echappe(c.entree)}</code>`, `<code>${echappe(obtenu)}</code>`,
+                   `<code>${echappe(c.attendu)}</code>`, note(c.pourquoi)],
+      };
+    }));
+
+  /* --- decomposer --------------------------------------------------- */
+  section("decomposer — base et qualificatif de rang",
+    ["entrée", "obtenu", "attendu", "pourquoi"],
+    cas.decomposer.map((c) => {
+      const obtenu = Noms.decomposer(c.entree);
+      const rendu = (o) => `${o.base} + « ${o.qualificatif || "—"} »`;
+      return {
+        ok: obtenu.base === c.base && obtenu.qualificatif === c.qualificatif,
+        cellules: [`<code>${echappe(c.entree)}</code>`, `<code>${echappe(rendu(obtenu))}</code>`,
+                   `<code>${echappe(rendu(c))}</code>`, note(c.pourquoi)],
+      };
+    }));
+
+  /* --- variantes ---------------------------------------------------- */
+  section("variantes", ["entrée", "obtenu", "attendu", "pourquoi"],
+    cas.variantes.map((c) => {
+      const obtenu = Noms.variantes(c.entree, c.options);
+      return {
+        ok: JSON.stringify(obtenu) === JSON.stringify(c.attendu),
+        cellules: [`<code>${echappe(c.entree)}</code>`,
+                   `<code>${echappe(JSON.stringify(obtenu))}</code>`,
+                   `<code>${echappe(JSON.stringify(c.attendu))}</code>`, note(c.pourquoi)],
+      };
+    }));
+
+  /* --- clé phonétique ----------------------------------------------- */
+  const clesIdentiques = cas.clePhonetique.identiques.map(([a, b, pourquoi]) => {
+    const ca = Noms.clePhonetique(a), cb = Noms.clePhonetique(b);
+    return {
+      ok: ca === cb,
+      cellules: [`<code>${echappe(a)}</code> / <code>${echappe(b)}</code>`,
+                 `<code>${echappe(ca)}</code> / <code>${echappe(cb)}</code>`,
+                 "mêmes clés", note(pourquoi)],
+    };
+  });
+  const clesDistinctes = cas.clePhonetique.distinctes.map(([a, b, pourquoi]) => {
+    const ca = Noms.clePhonetique(a), cb = Noms.clePhonetique(b);
+    return {
+      ok: ca !== cb,
+      cellules: [`<code>${echappe(a)}</code> / <code>${echappe(b)}</code>`,
+                 `<code>${echappe(ca)}</code> / <code>${echappe(cb)}</code>`,
+                 "clés différentes", note(pourquoi)],
+    };
+  });
+  section("clePhonetique — la clé de blocage doit réunir les variantes…",
+    ["paire", "clés obtenues", "attendu", "pourquoi"], clesIdentiques);
+  section("… et séparer ce qui n'a rien à voir",
+    ["paire", "clés obtenues", "attendu", "pourquoi"], clesDistinctes);
+
+  /* --- comparer ----------------------------------------------------- */
+  section("comparer — verdict", ["paire", "obtenu", "attendu", "pourquoi"],
+    cas.comparer.map((c) => {
+      const r = Noms.comparer(c.a, c.b);
+      return {
+        ok: r.verdict === c.verdict,
+        cellules: [`<code>${echappe(c.a)}</code> / <code>${echappe(c.b)}</code>`,
+                   `<code>${echappe(r.verdict)}</code> <span class="note">(${r.score.toFixed(2)})</span>`,
+                   `<code>${echappe(c.verdict)}</code>`, note(c.pourquoi)],
+      };
+    }));
+
+  /* --- Jaro-Winkler : propriétés ------------------------------------ */
+  const proprietes = [
+    ["identité", Noms.jaroWinkler("bunia", "bunia") === 1],
+    ["symétrie", Noms.jaroWinkler("aliba", "alibha") === Noms.jaroWinkler("alibha", "aliba")],
+    ["chaîne vide", Noms.jaroWinkler("", "bunia") === 0],
+    ["borné à 1", Noms.jaroWinkler("bunia", "buniaa") <= 1],
+    ["bonus de préfixe", Noms.jaroWinkler("zumbe", "zumba") > Noms.jaroWinkler("zumbe", "umbez")],
+  ];
+  section("jaroWinkler — propriétés", ["propriété", "", "", ""],
+    proprietes.map(([nom, ok]) => ({ ok: ok, cellules: [nom, "", "", ""] })));
+
+  bilan.textContent = echecs
+    ? `${echecs} contrôle${echecs > 1 ? "s" : ""} en échec sur ${total}`
+    : `${total} contrôles passés`;
+  bilan.className = echecs ? "echec" : "";
+})();
+</script>
+</body>
+</html>

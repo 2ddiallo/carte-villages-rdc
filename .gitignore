@@ -8,5 +8,10 @@ __pycache__/
 # scripts/convertir_villages.py.
 data_source/
 
+# Décisions de contrôle : elles portent le détail de demandes internes
+# (noms de villages proposés, motifs de rejet) et le dépôt est public. Elles
+# se rangent dans l'espace de travail de l'équipe, pas ici.
+decisions_*.csv
+
 # Configuration locale de l'éditeur / du serveur de test
 .claude/

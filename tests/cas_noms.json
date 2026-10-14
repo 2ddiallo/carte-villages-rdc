@@ -1,0 +1,100 @@
+{
+  "_lisez_moi": [
+    "Cas attendus pour js/noms.js. Exécutés par tests/tests.html.",
+    "Les paires viennent de cas réels : README (comparaison CHDC / GRID3),",
+    "data/rapprochement_chdc_absents.csv, et les divergences de graphie de",
+    "province relevées dans GUIDE-MISE-A-JOUR.md.",
+    "Modifier une règle de noms sans rejouer ces cas, c'est réintroduire un",
+    "problème déjà résolu."
+  ],
+
+  "normaliser": [
+    { "entree": "Sab'ba", "attendu": "sabba",
+      "pourquoi": "l'apostrophe est supprimée, pas remplacée par un espace" },
+    { "entree": "Sab’ba", "attendu": "sabba",
+      "pourquoi": "apostrophe typographique traitée comme la droite" },
+    { "entree": "Cité Mbandaka", "attendu": "mbandaka",
+      "pourquoi": "« cité » ne distingue rien" },
+    { "entree": "Camp", "attendu": "camp",
+      "pourquoi": "un mot parasite seul est conservé : sinon le nom disparaît" },
+    { "entree": "Maï-Ndombe", "attendu": "mai ndombe",
+      "pourquoi": "accents retirés, le tiret devient une coupure de mot" },
+    { "entree": "Mai-Ndombe", "attendu": "mai ndombe",
+      "pourquoi": "les deux graphies de province se rejoignent" },
+    { "entree": "  Bunia  ", "attendu": "bunia", "pourquoi": "espaces superflus" },
+    { "entree": null, "attendu": "", "pourquoi": "valeur absente tolérée" }
+  ],
+
+  "decomposer": [
+    { "entree": "Zumbe", "base": "zumbe", "qualificatif": "" },
+    { "entree": "Zumbe 1", "base": "zumbe", "qualificatif": "1" },
+    { "entree": "Zumbe I", "base": "zumbe", "qualificatif": "i" },
+    { "entree": "Zumbe Centre", "base": "zumbe", "qualificatif": "centre" },
+    { "entree": "Nderi 2", "base": "nderi", "qualificatif": "2" },
+    { "entree": "Kalamu 1", "base": "kalamu", "qualificatif": "1" },
+    { "entree": "Mont Ngafula", "base": "mont ngafula", "qualificatif": "",
+      "pourquoi": "« ngafula » n'est pas un qualificatif de rang" }
+  ],
+
+  "variantes": [
+    { "entree": "Dada Gr Dhendro", "options": { "retirerGroupement": true },
+      "attendu": ["dada"],
+      "pourquoi": "le suffixe désigne le groupement, pas le village" },
+    { "entree": "Sab'ba (Saba) Gr Sesele", "options": { "retirerGroupement": true },
+      "attendu": ["sabba", "saba"],
+      "pourquoi": "la variante entre parenthèses est une écriture à part entière" },
+    { "entree": "Dada Gr Dhendro", "options": {},
+      "attendu": ["dada dhendro"],
+      "pourquoi": "sans l'option, « gr » tombe comme mot parasite mais le groupement reste" }
+  ],
+
+  "clePhonetique": {
+    "identiques": [
+      ["Dhetchumbu", "Dhechunbu", "tch = ch, et le m/n final est instable — cas du README"],
+      ["Alibha", "Aliba", "bh = b dans les graphies alur et lendu"],
+      ["Tshikapa", "Chikapa", "tsh (tshiluba) = ch (français)"],
+      ["Ofoo", "Ofo", "voyelle doublée"],
+      ["Sabba", "Saba", "consonne doublée"],
+      ["Kwilu", "Kuilu", "w = u"],
+      ["Nyagoro", "Niagoro", "y = i"],
+      ["Kalemie", "Karemie", "l et r se confondent dans beaucoup de langues bantoues"],
+      ["Mbandaka", "Cité Mbandaka", "le mot parasite est retiré avant la clé"],
+      ["Djugu", "Jugu", "dj = j"],
+      ["Kambo", "Kanbo", "la nasale s'assimile à la consonne suivante"]
+    ],
+    "distinctes": [
+      ["Bunia", "Beni", "deux villes distinctes"],
+      ["Adravu", "Dradeni", "aucune parenté — cas réel du rapprochement"],
+      ["Aru", "Rumu", "cas réel : le rapprochement les avait mis face à face à tort"],
+      ["Kinshasa", "Kisangani", "deux villes distinctes"]
+    ]
+  },
+
+  "comparer": [
+    { "a": "Dhetchumbu", "b": "Dhechunbu", "verdict": "variante",
+      "pourquoi": "même lieu, deux graphies — le cas type du README" },
+    { "a": "Alibha", "b": "Aliba", "verdict": "variante" },
+    { "a": "Zumbe", "b": "Zumbe 1", "verdict": "meme-base",
+      "pourquoi": "voisins distincts, surtout pas un doublon" },
+    { "a": "Zumbe 1", "b": "Zumbe 2", "verdict": "meme-base" },
+    { "a": "Bunia", "b": "Bunia", "verdict": "identique" },
+    { "a": "Cité Mbandaka", "b": "Mbandaka", "verdict": "identique",
+      "pourquoi": "identiques une fois le mot parasite retiré" },
+    { "a": "Esibi", "b": "Essebi", "verdict": "variante",
+      "pourquoi": "à 592 m l'un de l'autre dans les données réelles — même village" },
+    { "a": "Rodo Aliba", "b": "Alibha", "verdict": "proche",
+      "pourquoi": "score faible (0,42) mais un mot en commun par la clé : c'est le blocage qui rattrape, pas le score" },
+
+    { "a": "Adravu", "b": "Dradeni", "verdict": "different" },
+    { "a": "Kinshasa", "b": "Kisangani", "verdict": "different" },
+
+    { "a": "Bolo", "b": "Loba", "verdict": "different",
+      "pourquoi": "21 m d'écart dans les données réelles, et pourtant deux villages — le contrôle de distance ne suffit jamais seul" },
+    { "a": "Aru", "b": "Rumu", "verdict": "different",
+      "pourquoi": "0,72 en Jaro-Winkler : sur des noms courts, un score élevé ne veut rien dire" },
+    { "a": "Urima", "b": "Godria", "verdict": "different",
+      "pourquoi": "0,70 — même remarque" },
+    { "a": "Izi", "b": "Nzinza", "verdict": "different",
+      "pourquoi": "18 m d'écart dans les données réelles" }
+  ]
+}

@@ -1,13 +1,24 @@
-# Déploiement de la carte sur GitHub Pages.
+# Déploiement de la carte publique sur GitHub Pages.
 #
 # Le constructeur Pages historique (« Deploy from a branch ») échouait
 # systématiquement sur ce dépôt : le job de build atteignait son plafond de
 # 15 minutes et était coupé, sans jamais publier. Les 12 Mo de GeoJSON en sont
-# la cause probable.
+# la cause probable. Ce workflow contourne le problème en téléversant les
+# fichiers tels quels, sans traitement Jekyll — le site est déjà du HTML
+# statique.
 #
-# Ce workflow contourne le problème : il téléverse le dossier tel quel comme
-# artefact, puis le déploie. Aucun traitement Jekyll, aucune transformation —
-# le site est déjà du HTML statique.
+# ⚠ Ce workflow ne publie PAS tout le dépôt.
+#
+# Le dépôt et le site sont publics, mais tout ce qu'il contient n'a pas
+# vocation à l'être : `controle.html` sert à examiner des demandes d'ajout de
+# villages, un travail interne. Sa mise en ligne ne fuiterait aucune donnée
+# (elle lit un fichier déposé localement, elle n'en héberge aucun), mais
+# publier un outil de contrôle interne invite à s'en servir — et rend plus
+# probable la mise en ligne, un jour, d'un fichier qui ne devait pas l'être.
+#
+# La liste blanche ci-dessous est donc explicite : ajouter un fichier au dépôt
+# ne le publie pas, il faut l'y déclarer. Pour vérifier après coup, la page
+# https://2ddiallo.github.io/carte-villages-rdc/controle.html doit renvoyer 404.
 
 name: Déploiement GitHub Pages
 
@@ -39,10 +50,34 @@ jobs:
       - name: Configuration de Pages
         uses: actions/configure-pages@v5
 
+      - name: Constitution du site public
+        run: |
+          set -euo pipefail
+          mkdir -p _site
+          # Liste blanche : seuls ces éléments partent en ligne.
+          cp index.html _site/
+          cp .nojekyll _site/
+          cp -R data _site/
+          cp -R js _site/
+
+          # Filet de sécurité : si la carte publique venait à référencer un
+          # fichier resté hors du site, autant l'apprendre ici plutôt que par
+          # une carte muette en production.
+          for ressource in $(grep -o '"\(data\|js\)/[^"]*"' index.html | tr -d '"' | sort -u); do
+            if [ ! -e "_site/$ressource" ]; then
+              echo "::error::index.html référence $ressource, absent du site publié."
+              exit 1
+            fi
+          done
+
+          echo "Site publié :"
+          du -sh _site
+          find _site -maxdepth 1 -mindepth 1 | sort
+
       - name: Téléversement du site
         uses: actions/upload-pages-artifact@v3
         with:
-          path: .
+          path: _site
 
       - name: Déploiement
         id: deploiement
