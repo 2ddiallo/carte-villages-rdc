@@ -37,12 +37,15 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from moissonner_grid3 import PROVINCES_RDC, slug  # noqa: E402
+from sources_grid3 import VERSION  # noqa: E402
 
 RACINE = Path(__file__).resolve().parent.parent
 
 # Ordre des valeurs dans chaque tableau de localité. La console lit cet ordre
 # depuis le fichier lui-même (clé « colonnes ») : le changer ici ne casse rien.
 COLONNES = ["id", "nom", "alt", "lat", "lon", "type", "zs", "as", "terr", "prec"]
+
+SOURCE = f"GRID3 COD – Settlement Names {VERSION} (CC BY 4.0)"
 
 DECIMALES = 5  # ≈ 1 m, très au-delà de la précision des relevés eux-mêmes
 
@@ -99,7 +102,7 @@ def construire_province(chemin: Path, province: str) -> dict:
 
     return {
         "province": province,
-        "source": "GRID3 COD – Settlement Names v8.0 (CC BY 4.0)",
+        "source": SOURCE,
         "colonnes": COLONNES,
         "types": types.valeurs,
         "zs": zones.valeurs,
@@ -163,10 +166,17 @@ def main() -> None:
         print(f"{province:<16} {len(donnees['points']):>7} localités   "
               f"{taille_source / 1_048_576:>5.2f} Mo → {taille_compacte / 1_048_576:>4.2f} Mo{alerte}")
 
+    # Avec --provinces, l'index garde les entrées des provinces non retraitées.
     chemin_index = dossier / "index.json"
+    if chemin_index.exists():
+        traitees = {entree["province"] for entree in index}
+        with open(chemin_index, encoding="utf-8") as fichier:
+            index += [e for e in json.load(fichier)["provinces"] if e["province"] not in traitees]
+        ordre = {p: i for i, p in enumerate(PROVINCES_RDC)}
+        index.sort(key=lambda e: ordre.get(e["province"], len(ordre)))
     with open(chemin_index, "w", encoding="utf-8") as fichier:
         json.dump({
-            "source": "GRID3 COD – Settlement Names v8.0 (CC BY 4.0)",
+            "source": SOURCE,
             "colonnes": COLONNES,
             "provinces": index,
         }, fichier, ensure_ascii=False, indent=1)

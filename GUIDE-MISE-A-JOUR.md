@@ -299,36 +299,70 @@ git add data/ index.html && git commit -m "MAJ villages + nouvelle colonne" && g
 
 ## Mettre à jour le référentiel GRID3
 
-À refaire **seulement à la sortie d'une nouvelle version GRID3** (la v8.0 date
-de décembre 2025). Une fois par an au plus.
+À refaire **seulement à la sortie d'une nouvelle version GRID3** (la v9.0 date
+de septembre 2026) ou d'un nouveau paquet provincial (GRID3 en publie pour le
+Nord-Kivu et l'Ituri, plus souvent que la version nationale). Une à deux fois
+par an.
 
-Les 26 provinces sont couvertes : un export contenant des villages de n'importe
-quelle province est désormais affiché et contrôlé sans rien avoir à déclarer.
-Il n'y a plus de liste de provinces à passer aux scripts.
+**1. Mettre à jour les adresses.** HDX crée une page par version et retire
+l'ancienne : les liens de la version précédente cessent de fonctionner (c'est
+ce qui est arrivé à la v8.0 en octobre 2026). Les nouvelles adresses se
+trouvent sur <https://data.humdata.org/organization/grid3>, ressources
+« *_provinces.zip ». Elles se reportent dans un seul fichier :
+`scripts/sources_grid3.py` (VERSION, ARCHIVES, PAQUETS_PROVINCIAUX).
 
-**Dans cet ordre** — chaque script a besoin des fichiers produits avant lui :
+**2. Relancer les scripts, dans cet ordre** — chaque script a besoin des
+fichiers produits avant lui :
 
 ```bash
-python3 scripts/moissonner_grid3.py
+python3 scripts/moissonner_grid3.py --cache ~/grid3
 python3 scripts/preparer_limites.py
-python3 scripts/moissonner_zones_sante.py
+python3 scripts/moissonner_zones_sante.py --cache ~/grid3
+python3 scripts/moissonner_etablissements.py --cache ~/grid3
 python3 scripts/attribuer_territoires.py
 python3 scripts/construire_referentiel.py
 ```
 
-Compter une vingtaine de minutes : 80 Mo à télécharger et beaucoup de contours
-à simplifier. Chaque script affiche son bilan — les lire, pas les survoler.
+`--cache ~/grid3` garde les fichiers téléchargés et les partage entre les
+scripts. Sans lui, chaque script retélécharge tout, y compris le paquet du
+Nord-Kivu (330 Mo). Compter **plus d'une heure** la première fois : HDX bride
+le débit à ~80 Ko/s. Chaque script affiche son bilan — les lire, pas les
+survoler.
 
-Puis vérifier en local et publier :
+Après un seul nouveau paquet provincial, inutile de tout refaire :
 
 ```bash
-git add data/ ref/ && git commit -m "Référentiel GRID3 v8.1" && git push
+python3 scripts/moissonner_grid3.py --cache ~/grid3 --provinces Ituri
+python3 scripts/moissonner_zones_sante.py --cache ~/grid3 --provinces Ituri
+python3 scripts/moissonner_etablissements.py --cache ~/grid3 --provinces Ituri
+python3 scripts/attribuer_territoires.py --provinces Ituri
+python3 scripts/construire_referentiel.py --provinces Ituri
 ```
 
+Les autres provinces sont conservées telles quelles.
+
+**3. Rejouer le jeu d'épreuve.** Ouvrir la console, y déposer
+`tests/lot_epreuve.csv` et comparer chaque verdict à la colonne `cas_attendu`.
+Ses cas sont calés sur des localités réelles d'Ituri : si GRID3 a déplacé ou
+renommé l'une d'elles, un cas peut changer de verdict sans que la console soit
+en cause. Il faut alors recaler le point du cas sur la nouvelle position
+(c'est ce qui a été fait au passage à la v9.0 pour « Ombatzi » et « Congo Ya
+Sika »).
+
+**4. Vérifier en local et publier :**
+
+```bash
+git add data/ ref/ tests/ && git commit -m "Référentiel GRID3 v9.1" && git push
+```
+
+> **Si un script s'arrête sur « Échec du téléchargement » avec une erreur
+> 404** : GRID3 a publié une nouvelle version et retiré la précédente. Voir
+> l'étape 1.
+>
 > **Si un script s'arrête sur « Token Required »** : le service ArcGIS de GRID3
-> est devenu privé en septembre 2026 et les scripts ont été réécrits pour lire
-> HDX. Un message d'erreur de ce type signifierait qu'une vieille version des
-> scripts a été remise en service. Voir la section correspondante du README.
+> est devenu privé en septembre 2026 et les scripts lisent désormais HDX. Ce
+> message signifierait qu'une vieille version des scripts a été remise en
+> service.
 
 ## Vérifications avant de publier
 

@@ -286,6 +286,10 @@
           <label for="case-groupements">Chefs-lieux de groupements <span style="color:#b08d3f">(2009)</span></label>
         </div>
         <div class="ligne-case">
+          <input type="checkbox" id="case-etablissements">
+          <label for="case-etablissements">Établissements de santé</label>
+        </div>
+        <div class="ligne-case">
           <input type="checkbox" id="case-noms" checked>
           <label for="case-noms">Noms des villages au zoom</label>
         </div>
@@ -303,7 +307,7 @@
     <div class="search-erreur" id="erreur-recherche" hidden></div>
     <div class="resultats" id="resultats" hidden></div>
     <div class="search-aide">
-      Village, territoire, zone ou aire de santé — ou des coordonnées
+      Village, territoire, zone ou aire de santé, établissement de santé — ou des coordonnées
       « latitude, longitude ». Les villes (Bunia, Goma…) se trouvent par leur
       zone de santé : le référentiel s'arrête au niveau du quartier.
     </div>
@@ -373,7 +377,7 @@ const CONFIG = {
       champTitre: "localite",
       champProvince: "province",
       champTerritoire: "territoire",
-      source: "GRID3 v8.0",
+      source: "GRID3 v9.0",
       champsPopup: [
         { champ: "localitetype",   libelle: "Type" },
         { champ: "localite_alt",   libelle: "Autre nom" },
@@ -454,7 +458,7 @@ satelliteLayer.addTo(map);
 
 // Attribution obligatoire des jeux de données (licences CC BY 4.0 et CC BY-IGO).
 map.attributionControl.addAttribution(
-  'Localités : <a href="https://grid3.org/">GRID3</a> (CC BY 4.0) — ' +
+  'Localités et établissements de santé : <a href="https://grid3.org/">GRID3</a> v9.0 (CC BY 4.0) — ' +
   'Limites : <a href="https://data.humdata.org/dataset/cod-ab-cod">OCHA COD-AB</a> (CC BY-IGO)'
 );
 
@@ -703,6 +707,124 @@ function marqueur(feature, cleCouche) {
   return m;
 }
 
+// ---------- Établissements de santé (GRID3) ----------
+// 39 000 établissements, 12 Mo : chargés province par province, comme les
+// localités, et seulement une fois la case cochée. Les points ne sont pas
+// regroupés : un hôpital doit rester visible comme tel.
+//
+// Ils sont dessinés dans le calque par défaut, celui des villages. Un calque
+// à part, posé au-dessus, aurait son propre canevas : il capterait tous les
+// clics et rendrait les villages inaccessibles.
+//
+// Les niveaux regroupent les types GRID3 (« Polyclinque » est l'orthographe
+// de la source). Un type inconnu tombe dans « autre ».
+const NIVEAUX_ETABLISSEMENT = [
+  { libelle: "Hôpital, centre de référence", couleur: "#dc2626", rayon: 6,
+    types: ["Hôpital Général de Référence", "Hôpital", "Centre Hopitalier",
+            "Centre de Santé de Référence", "Polyclinque", "Clinique"] },
+  { libelle: "Centre de santé", couleur: "#f472b6", rayon: 4.5,
+    types: ["Centre de Santé", "Centre Médical", "Dispensaire"] },
+  { libelle: "Poste ou site communautaire", couleur: "#c4b5fd", rayon: 3.5,
+    types: ["Poste de Santé", "Site Soin Communautaire"] },
+  { libelle: "Bureau de zone, autre", couleur: "#9ca3af", rayon: 3.5, types: [] },
+];
+const NIVEAU_PAR_TYPE = new Map(
+  NIVEAUX_ETABLISSEMENT.flatMap((n) => n.types.map((t) => [t, n]))
+);
+const CHAMPS_POPUP_ETABLISSEMENT = [
+  { champ: "type",           libelle: "Type" },
+  { champ: "gestion",        libelle: "Gestion" },
+  { champ: "zonesante",      libelle: "Zone de santé" },
+  { champ: "airesante",      libelle: "Aire de santé" },
+  { champ: "province",       libelle: "Province" },
+  { champ: "vaccfixe",       libelle: "Vaccination (site fixe)" },
+  { champ: "source_acronym", libelle: "Relevé par" },
+  { champ: "date",           libelle: "Année du relevé" },
+];
+
+const etablissements = new Map();          // province → features
+const chargementsEtablissements = new Map(); // province → Promise
+const coucheEtablissements = L.featureGroup();
+
+function fichierEtablissements(province) {
+  // « data/grid3_kasai-central.geojson » → « data/etablissements_kasai-central.geojson »
+  return province.fichier.replace("grid3_", "etablissements_");
+}
+
+function contenuPopupEtablissement(feature) {
+  const p = feature.properties;
+  const niveau = NIVEAU_PAR_TYPE.get(p.type) || NIVEAUX_ETABLISSEMENT.at(-1);
+  let html = `<div class="popup-title">${echapper(p.nom || "(sans nom)")}</div>`;
+  html += `<div class="popup-source" style="color:${niveau.couleur}">` +
+          `Établissement de santé — GRID3 v9.0</div>`;
+  for (const { champ, libelle } of CHAMPS_POPUP_ETABLISSEMENT) {
+    const valeur = p[champ];
+    if (valeur === null || valeur === undefined || valeur === "") continue;
+    html += `<div class="popup-row"><span class="popup-label">${echapper(libelle)} :</span> ` +
+            `${echapper(valeur)}</div>`;
+  }
+  const [lon, lat] = feature.geometry.coordinates;
+  html += `<div class="popup-row"><span class="popup-label">Coordonnées :</span> ` +
+          `${lat.toFixed(4)}, ${lon.toFixed(4)}</div>`;
+  return html;
+}
+
+function marqueurEtablissement(feature) {
+  if (feature._marqueur) return feature._marqueur;
+  const niveau = NIVEAU_PAR_TYPE.get(feature.properties.type) || NIVEAUX_ETABLISSEMENT.at(-1);
+  const [lon, lat] = feature.geometry.coordinates;
+  const m = L.circleMarker([lat, lon], {
+    radius: niveau.rayon, fillColor: niveau.couleur, fillOpacity: 0.95,
+    color: "#ffffff", weight: 1.2, opacity: 1,
+  });
+  m.bindPopup(() => contenuPopupEtablissement(feature));
+  m.bindTooltip(String(feature.properties.nom || ""), { direction: "top", offset: [0, -4] });
+  feature._marqueur = m;
+  return m;
+}
+
+function chargerEtablissements(nom) {
+  if (chargementsEtablissements.has(nom)) return chargementsEtablissements.get(nom);
+  const province = CONFIG.provinces.find((p) => p.nom === nom);
+  const url = fichierEtablissements(province);
+  const promesse = fetch(url, { cache: "no-cache" })
+    .then((rep) => { if (!rep.ok) throw new Error(`HTTP ${rep.status}`); return rep.json(); })
+    .then((geojson) => {
+      etablissements.set(nom, geojson.features);
+      majEtablissements();
+    })
+    .catch((err) => {
+      chargementsEtablissements.delete(nom);
+      console.warn(`Établissements (${nom}) non chargés :`, err.message);
+    });
+  chargementsEtablissements.set(nom, promesse);
+  return promesse;
+}
+
+function etablissementsAffiches() {
+  if (!document.getElementById("case-etablissements").checked) return [];
+  const resultat = [];
+  for (const province of etat.provincesActives) {
+    for (const f of etablissements.get(province) || []) {
+      // Le filtre de zone de santé vaut aussi pour les établissements.
+      if (etat.zoneSante && f.properties.zonesante !== etat.zoneSante) continue;
+      resultat.push(f);
+    }
+  }
+  return resultat;
+}
+
+function majEtablissements() {
+  if (!document.getElementById("case-etablissements").checked) {
+    map.removeLayer(coucheEtablissements);
+    return;
+  }
+  for (const nom of etat.provincesActives) chargerEtablissements(nom);
+  coucheEtablissements.clearLayers();
+  for (const f of etablissementsAffiches()) coucheEtablissements.addLayer(marqueurEtablissement(f));
+  coucheEtablissements.addTo(map);
+}
+
 // ---------- Filtrage ----------
 function passeFiltres(feature, cleCouche) {
   const couche = CONFIG.couches[cleCouche];
@@ -749,6 +871,7 @@ function rafraichirCarte() {
     const visibles = featuresVisibles();
     clusters.clearLayers();
     clusters.addLayers(visibles.map(([f, c]) => marqueur(f, c)));
+    majEtablissements();
     majBadge(visibles.length);
     majLabels();
   }, 30);
@@ -910,6 +1033,10 @@ function construireControles() {
     });
   }
   document.getElementById("case-noms").addEventListener("change", majLabels);
+  document.getElementById("case-etablissements").addEventListener("change", () => {
+    majEtablissements();
+    construireLegende();
+  });
 
   construireLegende();
 }
@@ -998,6 +1125,12 @@ function construireLegende() {
     html += `<div><span class="legend-dot" style="background:#f59e0b;` +
             `box-shadow:0 0 0 1px #fde68a"></span>` +
             `Chef-lieu de groupement <span style="opacity:.7">(2009)</span></div>`;
+  }
+  if (document.getElementById("case-etablissements").checked) {
+    for (const niveau of NIVEAUX_ETABLISSEMENT) {
+      html += `<div><span class="legend-dot" style="background:${niveau.couleur};` +
+              `box-shadow:0 0 0 1px #fff"></span>${echapper(niveau.libelle)}</div>`;
+    }
   }
   legende.innerHTML = html;
 }
@@ -1142,8 +1275,28 @@ function chercherParRegroupement(texte) {
     .slice(0, 5);
 }
 
-function afficherResultats(villages, regroupements) {
-  if (!villages.length && !regroupements.length) {
+// Seulement quand la couche est affichée, comme pour les localités.
+function chercherEtablissements(texte) {
+  const requete = normaliser(texte);
+  const trouves = [];
+  for (const feature of etablissementsAffiches()) {
+    const nom = feature.properties.nom;
+    if (!nom) continue;
+    const nomNormalise = normaliser(nom);
+    if (!nomNormalise.includes(requete)) continue;
+    trouves.push({
+      feature, nom,
+      score: nomNormalise.startsWith(requete) ? 0 : 1,
+      contexte: feature.properties.zonesante || feature.properties.province || "",
+    });
+    if (trouves.length > 200) break;
+  }
+  trouves.sort((a, b) => a.score - b.score || a.nom.localeCompare(b.nom, "fr"));
+  return trouves.slice(0, 10);
+}
+
+function afficherResultats(villages, regroupements, etablissementsTrouves = []) {
+  if (!villages.length && !regroupements.length && !etablissementsTrouves.length) {
     divResultats.innerHTML =
       `<div class="resultats-info">Aucun résultat parmi les localités affichées. ` +
       `Vérifie les couches et filtres actifs.</div>`;
@@ -1177,6 +1330,16 @@ function afficherResultats(villages, regroupements) {
               `autre(s) localité(s) — précise la recherche.</div>`;
     }
   }
+  if (etablissementsTrouves.length) {
+    html += `<div class="resultats-separateur">Établissements de santé</div>`;
+    html += etablissementsTrouves.map((r, i) => {
+      const niveau = NIVEAU_PAR_TYPE.get(r.feature.properties.type) || NIVEAUX_ETABLISSEMENT.at(-1);
+      return `<div class="resultat" data-type="etablissement" data-index="${i}">` +
+        `<span class="pastille" style="background:${niveau.couleur}"></span>` +
+        `<span class="nom">${echapper(r.nom)}</span>` +
+        `<span class="contexte">${echapper(r.contexte)}</span></div>`;
+    }).join("");
+  }
   divResultats.innerHTML = html;
 
   divResultats.querySelectorAll(".resultat").forEach((element) => {
@@ -1185,6 +1348,13 @@ function afficherResultats(villages, regroupements) {
       if (element.dataset.type === "zone") {
         const [sud, nord, ouest, est] = regroupements[index].bornes;
         map.fitBounds([[sud, ouest], [nord, est]], { padding: [40, 40], maxZoom: 14 });
+        return;
+      }
+      if (element.dataset.type === "etablissement") {
+        const r = etablissementsTrouves[index];
+        const [lon, lat] = r.feature.geometry.coordinates;
+        map.setView([lat, lon], 16);
+        setTimeout(() => marqueurEtablissement(r.feature).openPopup(), 250);
         return;
       }
       const r = limites[index];
@@ -1230,7 +1400,7 @@ function lancerRecherche() {
     divErreur.hidden = false;
     return;
   }
-  afficherResultats(chercherParNom(texte), chercherParRegroupement(texte));
+  afficherResultats(chercherParNom(texte), chercherParRegroupement(texte), chercherEtablissements(texte));
 }
 
 document.getElementById("form-recherche").addEventListener("submit", (evt) => {
@@ -1244,7 +1414,8 @@ document.getElementById("champ-recherche").addEventListener("input", (evt) => {
   const texte = evt.target.value.trim();
   if (texte.length < 2 || parserCoordonnees(texte)) { divResultats.hidden = true; return; }
   minuterieRecherche = setTimeout(
-    () => afficherResultats(chercherParNom(texte), chercherParRegroupement(texte)), 200);
+    () => afficherResultats(chercherParNom(texte), chercherParRegroupement(texte),
+                            chercherEtablissements(texte)), 200);
 });
 
 btnEffacer.addEventListener("click", () => {

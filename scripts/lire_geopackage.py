@@ -161,15 +161,17 @@ def colonnes(chemin: Path, table: str = None) -> list:
         connexion.close()
 
 
-def lire(chemin: Path, colonnes_voulues: list = None, geometrie: bool = True):
+def lire(chemin: Path, colonnes_voulues: list = None, geometrie: bool = True,
+         table: str = None):
     """Parcourt la table de données. Produit un dictionnaire par ligne.
 
     `colonnes_voulues` filtre les attributs (les colonnes absentes sont
     ignorées sans erreur). La géométrie décodée est placée sous la clé
-    « geometrie ».
+    « geometrie ». `table` choisit la table quand le fichier en a plusieurs
+    (paquets provinciaux GRID3) ; par défaut, la première.
     """
     chemin = Path(chemin)
-    table = table_principale(chemin)
+    table = table or table_principale(chemin)
     presentes = colonnes(chemin, table)
 
     connexion = sqlite3.connect(f"file:{chemin}?mode=ro", uri=True)

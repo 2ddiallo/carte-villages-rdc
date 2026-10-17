@@ -1,5 +1,5 @@
 {
- "source": "GRID3 COD – Settlement Names v8.0 (CC BY 4.0)",
+ "source": "GRID3 COD – Settlement Names v9.0 (CC BY 4.0)",
  "colonnes": [
   "id",
   "nom",
@@ -40,26 +40,26 @@
   {
    "province": "Haut-Katanga",
    "fichier": "ref/haut-katanga.json",
-   "localites": 6943,
+   "localites": 6941,
    "bbox": [
     25.4143,
     -13.37806,
     29.80856,
     -7.63021
    ],
-   "octets": 474393
+   "octets": 473787
   },
   {
    "province": "Haut-Lomami",
    "fichier": "ref/haut-lomami.json",
-   "localites": 4445,
+   "localites": 4449,
    "bbox": [
     23.69312,
     -10.05174,
     27.85094,
     -6.18663
    ],
-   "octets": 301448
+   "octets": 301691
   },
   {
    "province": "Haut-Uele",
@@ -76,14 +76,14 @@
   {
    "province": "Ituri",
    "fichier": "ref/ituri.json",
-   "localites": 6418,
+   "localites": 6475,
    "bbox": [
-    27.38656,
+    27.55661,
     0.56197,
-    31.26484,
+    31.26904,
     3.64507
    ],
-   "octets": 418235
+   "octets": 422716
   },
   {
    "province": "Kasaï",
@@ -95,31 +95,31 @@
     22.27478,
     -2.58251
    ],
-   "octets": 424959
+   "octets": 423289
   },
   {
    "province": "Kasaï-Central",
    "fichier": "ref/kasai-central.json",
-   "localites": 6735,
+   "localites": 6734,
    "bbox": [
     21.41384,
     -7.9037,
     23.78021,
     -4.39037
    ],
-   "octets": 475988
+   "octets": 475916
   },
   {
    "province": "Kasaï-Oriental",
    "fichier": "ref/kasai-oriental.json",
-   "localites": 2688,
+   "localites": 2689,
    "bbox": [
     22.97248,
     -6.74468,
     24.04243,
     -5.68334
    ],
-   "octets": 185589
+   "octets": 185590
   },
   {
    "province": "Kinshasa",
@@ -131,7 +131,7 @@
     16.5128,
     -3.9593
    ],
-   "octets": 258986
+   "octets": 257642
   },
   {
    "province": "Kongo-Central",
@@ -143,79 +143,79 @@
     16.21328,
     -4.31507
    ],
-   "octets": 702103
+   "octets": 701565
   },
   {
    "province": "Kwango",
    "fichier": "ref/kwango.json",
-   "localites": 3255,
+   "localites": 3576,
    "bbox": [
-    16.12814,
-    -8.0683,
-    19.84726,
+    16.15724,
+    -8.07954,
+    19.89485,
     -4.24722
    ],
-   "octets": 214233
+   "octets": 237920
   },
   {
    "province": "Kwilu",
    "fichier": "ref/kwilu.json",
-   "localites": 7498,
+   "localites": 7507,
    "bbox": [
     16.50576,
     -6.34328,
     20.17153,
     -3.273
    ],
-   "octets": 515118
+   "octets": 515323
   },
   {
    "province": "Lomami",
    "fichier": "ref/lomami.json",
-   "localites": 4106,
+   "localites": 4015,
    "bbox": [
-    23.02203,
+    23.02173,
     -8.08859,
-    26.19919,
-    -4.87877
+    26.17413,
+    -4.87628
    ],
-   "octets": 276085
+   "octets": 269079
   },
   {
    "province": "Lualaba",
    "fichier": "ref/lualaba.json",
-   "localites": 6317,
+   "localites": 6299,
    "bbox": [
     21.77266,
     -11.71745,
     27.143,
     -7.66502
    ],
-   "octets": 469674
+   "octets": 468260
   },
   {
    "province": "Mai-Ndombe",
    "fichier": "ref/mai-ndombe.json",
-   "localites": 4102,
+   "localites": 4099,
    "bbox": [
     15.91842,
     -4.37874,
     20.64529,
     -0.72387
    ],
-   "octets": 287286
+   "octets": 286223
   },
   {
    "province": "Maniema",
    "fichier": "ref/maniema.json",
-   "localites": 6116,
+   "localites": 6142,
    "bbox": [
     24.76633,
-    -5.13753,
+    -5.13683,
     28.74894,
     -0.39047
    ],
-   "octets": 423954
+   "octets": 429561
   },
   {
    "province": "Mongala",
@@ -227,19 +227,19 @@
     23.45198,
     3.18311
    ],
-   "octets": 302324
+   "octets": 302057
   },
   {
    "province": "Nord-Kivu",
    "fichier": "ref/nord-kivu.json",
-   "localites": 5617,
+   "localites": 5620,
    "bbox": [
     27.27259,
     -1.99519,
     29.97074,
     0.91147
    ],
-   "octets": 383474
+   "octets": 383267
   },
   {
    "province": "Nord-Ubangi",
@@ -251,19 +251,19 @@
     23.13784,
     5.14321
    ],
-   "octets": 160517
+   "octets": 160490
   },
   {
    "province": "Sankuru",
    "fichier": "ref/sankuru.json",
-   "localites": 3288,
+   "localites": 3290,
    "bbox": [
     21.91713,
     -5.83281,
     25.03055,
     -1.70633
    ],
-   "octets": 224824
+   "octets": 224912
   },
   {
    "province": "Sud-Kivu",
@@ -287,19 +287,19 @@
     20.89857,
     4.75946
    ],
-   "octets": 265977
+   "octets": 266059
   },
   {
    "province": "Tanganyika",
    "fichier": "ref/tanganyika.json",
-   "localites": 6657,
+   "localites": 6647,
    "bbox": [
     25.99952,
-    -8.43659,
+    -8.40437,
     30.59166,
     -4.97596
    ],
-   "octets": 438746
+   "octets": 438091
   },
   {
    "province": "Tshopo",
@@ -311,19 +311,19 @@
     28.15,
     2.2656
    ],
-   "octets": 448496
+   "octets": 448315
   },
   {
    "province": "Tshuapa",
    "fichier": "ref/tshuapa.json",
-   "localites": 4284,
+   "localites": 4283,
    "bbox": [
     19.52632,
     -2.18998,
     24.19065,
     1.76779
    ],
-   "octets": 300270
+   "octets": 300015
   }
  ]
 }

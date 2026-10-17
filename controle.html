@@ -218,7 +218,7 @@ table.voisins .note { color: var(--gris); }
   <div class="boite">
     <h2>Vérifier des villages avant de les ajouter à la base</h2>
     <p>
-      Chaque village proposé est confronté au référentiel GRID3 (127 942 localités,
+      Chaque village proposé est confronté au référentiel GRID3 v9.0 (128 239 localités,
       les 26 provinces), à la base interne actuelle et aux limites administratives.
       Huit contrôles cherchent les coordonnées douteuses et les doublons cachés
       derrière une autre graphie. Le verdict trie la file&nbsp;; la décision reste
@@ -515,12 +515,12 @@ function preparerCarte() {
   const satellite = L.tileLayer(
     "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
     {
-      attribution: "Imagerie &copy; Esri — Localités GRID3 v8.0 (CC BY 4.0) — Limites COD-AB, OCHA",
+      attribution: "Imagerie &copy; Esri — Localités GRID3 v9.0 (CC BY 4.0) — Limites COD-AB, OCHA",
       maxZoom: 21, maxNativeZoom: 17,
     }
   );
   const standard = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    attribution: "&copy; OpenStreetMap — Localités GRID3 v8.0 (CC BY 4.0) — Limites COD-AB, OCHA",
+    attribution: "&copy; OpenStreetMap — Localités GRID3 v9.0 (CC BY 4.0) — Limites COD-AB, OCHA",
     maxZoom: 19,
   });
   satellite.addTo(carte);

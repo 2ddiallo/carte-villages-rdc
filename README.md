@@ -18,18 +18,23 @@ jeux de données qui restent **indépendants, jamais fusionnés** :
 
 | Couche | Contenu | Points | Origine |
 |---|---|---:|---|
-| **Référentiel GRID3** | Toutes les localités nommées de la RDC | **127 942** | Donnée ouverte (CC BY 4.0) |
+| **Référentiel GRID3** | Toutes les localités nommées de la RDC | **128 239** | Donnée ouverte (CC BY 4.0) |
 | **Données CHDC** | L'export opérationnel mensuel | 10 852 | Export partenaire |
+
+S'y ajoute, dans l'habillage, une couche facultative des **établissements de
+santé** GRID3 (38 995 : hôpitaux, centres et postes de santé, sites
+communautaires, bureaux de zone), colorés par niveau et cliquables.
 
 Les 4 provinces de l'Est sont cochées à l'ouverture ; les 22 autres se chargent
 à la demande. Tout activer d'emblée représenterait 40 Mo et 128 000 points.
 
 Fonctions : clustering, popup d'attributs, **cinq niveaux de découpage**
 (provinces, territoires, zones de santé, secteurs et chefferies, chefs-lieux de
-groupements), noms au zoom, bascule Standard / Satellite, filtres (province,
-territoire, zone de santé, type de localité), recherche par **nom de village**,
-par **zone de santé** ou par **coordonnées GPS**, et zoom rapproché direct au
-clic sur un village.
+groupements), **établissements de santé**, noms au zoom, bascule Standard /
+Satellite, filtres (province, territoire, zone de santé, type de localité),
+recherche par **nom de village**, par **zone de santé**, par **nom
+d'établissement** ou par **coordonnées GPS**, et zoom rapproché direct au clic
+sur un village.
 
 **Aucun abonnement, aucune clé API, aucun serveur à administrer** : une page
 HTML statique + des fichiers GeoJSON, hébergés gratuitement (GitHub Pages).
@@ -72,21 +77,29 @@ navigateur. Rien n'est téléversé, rien n'est publié. Mode d'emploi complet :
 L'attribution est **obligatoire** (elle figure dans le bandeau en bas de la
 carte, ne pas la retirer) :
 
-- **Localités** — GRID3 COD – Settlement Names **v8.0** (décembre 2025), produit
-  par CIESIN/Columbia et WorldPop avec l'INS et le Ministère de la Santé.
-  Licence **CC BY 4.0**. **127 942 localités**, les 26 provinces.
-- **Limites des zones de santé** — GRID3 COD – Health Zones **v8.0**
-  (janvier 2026). Licence **CC BY 4.0**. **519 zones de santé**. Même millésime
-  v8.0 que les localités : le champ `zonesante` y porte exactement les mêmes
-  valeurs, donc le filtre de la carte et les limites affichées désignent bien
-  les mêmes entités (vérifié : aucun orphelin d'un côté ni de l'autre).
+- **Localités** — [GRID3 COD – Settlement Names **v9.0**](https://data.humdata.org/dataset/grid3-cod-settlement-names-v9-0)
+  (septembre 2026), produit par CIESIN/Columbia avec le Ministère de la Santé.
+  Licence **CC BY 4.0**. **128 239 localités**, les 26 provinces.
+- **Limites des zones de santé** — [GRID3 COD – Health Zones **v9.0**](https://data.humdata.org/dataset/grid3-cod-health-zones-v9-0).
+  Licence **CC BY 4.0**. **519 zones de santé**. Même millésime que les
+  localités : le champ `zonesante` y porte les mêmes valeurs, donc le filtre de
+  la carte et les limites affichées désignent bien les mêmes entités.
+- **Établissements de santé** — [GRID3 COD – Health Facilities **v9.0**](https://data.humdata.org/dataset/grid3-cod-health-facilities-v9-0).
+  Licence **CC BY 4.0**. **38 995 établissements**.
+- **Nord-Kivu et Ituri** — pour ces deux provinces, GRID3 publie à part des
+  paquets plus récents que la v9.0, qu'il déclare la remplacer :
+  [Nord-Kivu (28/09/2026)](https://data.humdata.org/dataset/grid3-cod-nord-kivu-geospatial-data-layers)
+  et [Ituri (14/09/2026)](https://data.humdata.org/dataset/grid3-cod-ituri-geospatial-data-layers).
+  Les trois couches GRID3 de la carte en sont tirées pour ces provinces.
 
-  > ℹ️ **Les pages HDX de la v8.0 ont été retirées** : GRID3 publie depuis
-  > septembre 2026 la **v9.0**, qui les remplace —
-  > [Settlement Names v9.0](https://data.humdata.org/dataset/grid3-cod-settlement-names-v9-0)
-  > et [Health Zones v9.0](https://data.humdata.org/dataset/grid3-cod-health-zones-v9-0).
-  > Les données de ce dépôt restent celles de la v8.0 ; passer à la v9.0
-  > suppose de relancer les scripts de moisson et de revérifier les comptages.
+  > ℹ️ **Passage de la v8.0 à la v9.0 (octobre 2026).** GRID3 a refait 7
+  > provinces (Haut-Katanga, Haut-Lomami, Ituri, Kwango, Lomami, Maniema,
+  > Tanganyika) et normalisé des noms partout (mots « Camp », « Ferme »,
+  > « Bloc » retirés des noms de lieux, noms de zones et d'aires alignés sur le
+  > DHIS2). L'Ituri, le Kwango et le Lomami ont été largement relevés à
+  > nouveau : environ 4 000, 2 150 et 1 740 localités nouvelles, à peu près
+  > autant de disparues ou déplacées. Les identifiants `grid3id` de ces
+  > provinces ont changé.
 - **Limites administratives** — [COD-AB](https://data.humdata.org/dataset/cod-ab-cod),
   OCHA Field Information Services Section, mise à jour du 16 avril 2026.
   Licence **CC BY-IGO**. 26 provinces (ADM1), **164 territoires** (ADM2).
@@ -102,10 +115,13 @@ ArcGIS de GRID3 (`services3.arcgis.com/BU6Aadhn6tbBEdyk`). Ce service **répond
 désormais « Token Required » (code 499)** à toute requête, y compris un simple
 comptage. Il n'est plus utilisable sans compte ArcGIS.
 
-Les deux scripts ont été réécrits pour lire les **mêmes jeux v8.0 publiés en
-accès libre sur HDX**, sous forme d'archives de GeoPackage — un fichier par
-province. C'est plus robuste : un téléchargement unique au lieu de dizaines de
-requêtes paginées, et pas de dépendance à la disponibilité d'une API.
+Les scripts lisent depuis les **archives de GeoPackage publiées en accès libre
+sur HDX** — un fichier par province, la v8.0 d'abord, la v9.0 depuis octobre
+2026. C'est plus robuste : un téléchargement unique au lieu de dizaines de
+requêtes paginées, et pas de dépendance à la disponibilité d'une API. Les
+adresses HDX vivent toutes dans `scripts/sources_grid3.py` : HDX crée une page
+par version et retire l'ancienne, c'est le seul fichier à retoucher à la
+prochaine version.
 
 Contrôle effectué avant bascule : sur l'Ituri, les deux sources donnent
 **6 418 localités, les mêmes identifiants, les mêmes coordonnées**. Rien n'a
@@ -240,7 +256,7 @@ C'est le jeu de localités publié par OCHA RDC sur HDX
 ([`dr-congo-settlements`](https://data.humdata.org/dataset/dr-congo-settlements),
 licence ODbL, shapefile en projection World Mercator).
 
-| | OCHA 2017 | GRID3 v8.0 |
+| | OCHA 2017 | GRID3 v8.0 *(comparaison faite avant la v9.0)* |
 |---|---:|---:|
 | Localités (RDC entière) | 26 710 | **127 942** |
 | Sur les 11 provinces alors couvertes | 13 984 | **60 726** — 4,3× plus |
@@ -322,6 +338,7 @@ carte-villages-rdc/
 │   ├── provinces.geojson                 26 provinces (ADM1)
 │   ├── territoires.geojson               164 territoires (ADM2)
 │   ├── zones_sante.geojson               519 zones de santé
+│   ├── etablissements_<province>.geojson 26 fichiers, établissements de santé
 │   ├── secteurs.geojson                  737 secteurs et chefferies (2010)
 │   ├── groupements.geojson               1 681 chefs-lieux (2009)
 │   └── rapprochement_chdc_absents.csv     Villages CHDC sans équivalent GRID3
@@ -334,9 +351,11 @@ carte-villages-rdc/
 │   └── lot_epreuve.csv                   Jeu d'épreuve : un cas par contrôle
 ├── data_source/                        Exports bruts du partenaire — jamais publiés
 └── scripts/
+    ├── sources_grid3.py                Adresses HDX de la version GRID3 en vigueur
     ├── moissonner_grid3.py             Localités GRID3 (HDX) → GeoJSON
     ├── preparer_limites.py             COD-AB → provinces et territoires
     ├── moissonner_zones_sante.py       Zones de santé GRID3 (HDX)
+    ├── moissonner_etablissements.py    Établissements de santé GRID3 (HDX)
     ├── attribuer_territoires.py        Ajoute le territoire aux points GRID3
     ├── convertir_secteurs.py           Secteurs et groupements (archives MONUC)
     ├── construire_referentiel.py       data/ → ref/ (format compact)
@@ -392,32 +411,44 @@ Le résumé ci-dessous suffit pour un export habituel.
 
 ## Mise à jour du référentiel GRID3
 
-À refaire seulement à la sortie d'une nouvelle version GRID3 (v8.0 date de
-décembre 2025). **Dans cet ordre** — `attribuer_territoires.py` a besoin des
-fichiers produits avant lui, et `construire_referentiel.py` de tous les autres :
+À refaire seulement à la sortie d'une nouvelle version GRID3 (la v9.0 date de
+septembre 2026) ou d'un nouveau paquet provincial. Commencer par mettre à jour
+les adresses dans `scripts/sources_grid3.py`. Puis, **dans cet ordre** —
+`attribuer_territoires.py` a besoin des fichiers produits avant lui, et
+`construire_referentiel.py` de tous les autres :
 
 ```bash
-python3 scripts/moissonner_grid3.py
+python3 scripts/moissonner_grid3.py --cache ~/grid3
 python3 scripts/preparer_limites.py
-python3 scripts/moissonner_zones_sante.py
+python3 scripts/moissonner_zones_sante.py --cache ~/grid3
+python3 scripts/moissonner_etablissements.py --cache ~/grid3
 python3 scripts/attribuer_territoires.py
 python3 scripts/construire_referentiel.py
 ```
 
-Plus aucune liste de provinces à passer : les 26 sont le défaut partout.
+Les 26 provinces sont le défaut partout. `--provinces` limite un passage à
+quelques provinces (par exemple après la sortie d'un seul paquet provincial) :
+les autres sont conservées, y compris dans `zones_sante.geojson` et
+`ref/index.json`. `--cache` garde les fichiers téléchargés et les partage entre
+les scripts — utile surtout pour le paquet du Nord-Kivu, qui pèse 330 Mo (HDX
+limite le débit à ~80 Ko/s par connexion : compter plus d'une heure).
 
-- `moissonner_grid3.py` télécharge l'archive HDX des GeoPackage (~10 Mo) et
-  écrit un GeoJSON par province. Total : **127 942 localités**, 40 Mo.
+- `moissonner_grid3.py` télécharge l'archive HDX des GeoPackage (~11 Mo) et les
+  paquets du Nord-Kivu et de l'Ituri, puis écrit un GeoJSON par province.
+  Total : **128 239 localités**, 40 Mo.
 - `preparer_limites.py` télécharge l'archive COD-AB (~24 Mo) et simplifie les
   contours (Douglas-Peucker, tolérance 0,002° ≈ 220 m) : les provinces passent
   de 97 600 à 21 548 points, les 164 territoires de 224 696 à 48 339. Les
   contours de la carte sont donc **indicatifs**, pas une référence juridique.
 - `moissonner_zones_sante.py` télécharge l'archive HDX des zones de santé
-  (~46 Mo) et simplifie plus fortement (0,003° ≈ 330 m) : les 519 polygones
-  passent de **4 131 532 à 74 576 points**, soit 1,46 Mo. Sans cela le fichier
+  (~55 Mo) et simplifie plus fortement (0,003° ≈ 330 m) : les 519 polygones
+  passent de **4,7 millions à 75 000 points**, soit 1,5 Mo. Sans cela le fichier
   pèserait des dizaines de mégaoctets pour un simple habillage.
+- `moissonner_etablissements.py` télécharge l'archive HDX des établissements
+  (~4 Mo) et écrit un GeoJSON par province (12 Mo au total), chargé seulement
+  quand on coche la couche.
 - `attribuer_territoires.py` ajoute le champ `territoire` à chaque point GRID3
-  par recoupement géométrique : **98,2 %** des points. Les 1,8 % restants sont
+  par recoupement géométrique : **98,1 %** des points. Les 1,8 % restants sont
   à moins de ~220 m d'une limite, ou sur un lac.
 - `construire_referentiel.py` réencode `data/` en `ref/` pour la console :
   dictionnaires de valeurs répétées, tableaux sans noms de champs, 5 décimales.

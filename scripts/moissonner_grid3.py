@@ -6,27 +6,20 @@ province par fichier.
 Usage :
     python3 scripts/moissonner_grid3.py                    # les 26 provinces
     python3 scripts/moissonner_grid3.py --provinces Ituri Nord-Kivu
-    python3 scripts/moissonner_grid3.py --archive /chemin/vers/archive.zip
+    python3 scripts/moissonner_grid3.py --cache ~/grid3    # garde les téléchargements
 
-Source : GRID3 COD – Settlement Names v8.0 (décembre 2025), produit par
-CIESIN/Columbia et WorldPop avec l'INS et le Ministère de la Santé.
-Licence CC BY 4.0 — l'attribution est obligatoire sur la carte.
-127 942 localités nommées sur toute la RDC.
+Source : GRID3 COD – Settlement Names v9.0 (septembre 2026), produit par
+CIESIN/Columbia avec le Ministère de la Santé. Pour le Nord-Kivu et l'Ituri,
+les paquets provinciaux de GRID3, plus récents, remplacent la v9.0 (voir
+`sources_grid3.py`). Licence CC BY 4.0 — l'attribution est obligatoire sur la
+carte. 128 239 localités nommées sur toute la RDC.
 
-⚠ Changement de source (septembre 2026)
-────────────────────────────────────────
-Ce script interrogeait le service ArcGIS de GRID3
-(services3.arcgis.com/BU6Aadhn6tbBEdyk). Ce service est devenu privé : toute
-requête, même un simple comptage, répond désormais « Token Required »
-(code 499). Il n'est plus utilisable sans compte ArcGIS.
-
-Le même jeu v8.0 reste publié en accès libre sur HDX, sous forme d'une archive
-de 26 GeoPackage — un par province. C'est cette archive qui est téléchargée
-ici. Le contenu est identique (contrôlé : Ituri donne 6 418 localités des deux
-côtés, mêmes identifiants) et le fichier de sortie n'a pas changé de forme.
-
-Au passage, cette source est plus robuste : un téléchargement unique de 10 Mo
-au lieu de 64 requêtes paginées, pas de dépendance à la disponibilité d'une API.
+Historique des sources
+──────────────────────
+Jusqu'en août 2026, ce script interrogeait le service ArcGIS de GRID3, devenu
+privé (« Token Required », code 499). Il a alors basculé sur les archives de
+GeoPackage publiées sur HDX (v8.0), puis sur la v9.0 quand HDX a retiré la
+v8.0 en octobre 2026. Les adresses vivent toutes dans `sources_grid3.py`.
 
 Lecture des GeoPackage
 ──────────────────────
@@ -45,31 +38,17 @@ Contrôles effectués :
 
 import argparse
 import json
-import shutil
 import sqlite3
 import sys
 import tempfile
-import unicodedata
-import urllib.error
-import urllib.request
-import zipfile
 from pathlib import Path
 
-# Archive « GRID3_COD_v8_province_settlement_names.zip » du jeu HDX
-# « grid3-cod-settlement-names-v8-0 » : 26 GeoPackage, 10,4 Mo.
-ARCHIVE_HDX = (
-    "https://data.humdata.org/dataset/5b8ce4e9-2525-4f1b-988d-91ab212c9c6b/"
-    "resource/4aea8452-198c-40c5-b938-b6a24f160738/download/"
-    "grid3_cod_v8_province_settlement_names.zip"
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+# PROVINCES_RDC, slug et cle_province restent importables depuis ce module :
+# plusieurs scripts les y prennent.
+from sources_grid3 import (  # noqa: E402
+    PROVINCES_RDC, VERSION, ajouter_options, cle_province, slug, sources_par_province,
 )
-
-PROVINCES_RDC = [
-    "Bas-Uele", "Equateur", "Haut-Katanga", "Haut-Lomami", "Haut-Uele", "Ituri",
-    "Kasaï", "Kasaï-Central", "Kasaï-Oriental", "Kinshasa", "Kongo-Central",
-    "Kwango", "Kwilu", "Lomami", "Lualaba", "Mai-Ndombe", "Maniema", "Mongala",
-    "Nord-Kivu", "Nord-Ubangi", "Sankuru", "Sud-Kivu", "Sud-Ubangi",
-    "Tanganyika", "Tshopo", "Tshuapa",
-]
 
 # Colonnes lues dans le GeoPackage → nom de la propriété écrite en GeoJSON.
 # La colonne s'appelle « precision » dans le GeoPackage et s'appelait
@@ -86,6 +65,7 @@ CHAMPS = {
     "source_acronym": "source_acronym",
     "date": "date",
     "precision": "precision_",
+    "precision_": "precision_",   # orthographe des paquets provinciaux
     "grid3id": "grid3id",
 }
 
@@ -97,70 +77,28 @@ RDC_LON_MIN, RDC_LON_MAX = 11.0, 32.0
 CORRECTIONS_TYPE = {"Quaŕtier": "Quartier"}
 
 
-def slug(texte: str) -> str:
-    """« Nord-Kivu » → « nord-kivu », pour les noms de fichiers."""
-    sans_accent = unicodedata.normalize("NFKD", texte).encode("ascii", "ignore").decode()
-    return sans_accent.lower().replace(" ", "-")
+def lire_geopackage(chemin: Path, table: str = None, champs: dict = CHAMPS) -> list:
+    """Lit une table de points (lat/lon en colonnes). Renvoie une liste de dictionnaires.
 
-
-def cle_province(nom: str) -> str:
-    """Clé de comparaison tolérante aux variantes d'écriture d'une province.
-
-    « Kasaï-Central », « Kasai Central » et « kasaicentral » se rejoignent.
+    `table` : à préciser pour un paquet provincial (plusieurs tables).
     """
-    sans_accent = unicodedata.normalize("NFKD", nom).encode("ascii", "ignore").decode()
-    return sans_accent.lower().replace("-", "").replace(" ", "").replace("'", "")
-
-
-def telecharger_archive(destination: Path) -> Path:
-    """Télécharge l'archive des GeoPackage depuis HDX."""
-    print("Téléchargement de l'archive GRID3 depuis HDX (~10 Mo)…")
-    try:
-        with urllib.request.urlopen(ARCHIVE_HDX, timeout=300) as reponse, \
-                open(destination, "wb") as fichier:
-            shutil.copyfileobj(reponse, fichier)
-    except (urllib.error.URLError, TimeoutError) as erreur:
-        sys.exit(
-            f"Échec du téléchargement : {erreur}\n"
-            "Si le lien a changé, retrouver la ressource « province settlement names » sur\n"
-            "https://data.humdata.org/dataset/grid3-cod-settlement-names-v8-0"
-        )
-    print(f"    {destination.stat().st_size / 1_048_576:.1f} Mo téléchargés\n")
-    return destination
-
-
-def extraire(archive: Path, dossier: Path) -> dict:
-    """Extrait les GeoPackage. Renvoie {clé de province: chemin du fichier}."""
-    with zipfile.ZipFile(archive) as zip_archive:
-        zip_archive.extractall(dossier)
-
-    fichiers = {}
-    for chemin in dossier.rglob("*.gpkg"):
-        # « GRID3_COD_Kasaï-Central_settlement_names_v8_0.gpkg » → « Kasaï-Central »
-        milieu = chemin.stem.removeprefix("GRID3_COD_").removesuffix("_settlement_names_v8_0")
-        fichiers[cle_province(milieu)] = chemin
-    if not fichiers:
-        sys.exit(f"Aucun GeoPackage trouvé dans {archive.name} — archive inattendue ?")
-    return fichiers
-
-
-def lire_geopackage(chemin: Path) -> list:
-    """Lit une table de localités. Renvoie une liste de dictionnaires."""
     connexion = sqlite3.connect(f"file:{chemin}?mode=ro", uri=True)
     try:
-        tables = [ligne[0] for ligne in connexion.execute(
-            "SELECT table_name FROM gpkg_contents WHERE data_type = 'features'"
-        )]
-        if not tables:
-            sys.exit(f"{chemin.name} : aucune table de données.")
+        if table is None:
+            tables = [ligne[0] for ligne in connexion.execute(
+                "SELECT table_name FROM gpkg_contents WHERE data_type = 'features'"
+            )]
+            if not tables:
+                sys.exit(f"{chemin.name} : aucune table de données.")
+            table = tables[0]
 
-        colonnes = [ligne[1] for ligne in connexion.execute(f'PRAGMA table_info("{tables[0]}")')]
+        colonnes = [ligne[1] for ligne in connexion.execute(f'PRAGMA table_info("{table}")')]
         manquantes = [c for c in ("lat", "lon") if c not in colonnes]
         if manquantes:
-            sys.exit(f"{chemin.name} : colonnes {manquantes} absentes — format inattendu.")
+            sys.exit(f"{chemin.name} ({table}) : colonnes {manquantes} absentes — format inattendu.")
 
-        lues = ["lat", "lon"] + [c for c in CHAMPS if c in colonnes]
-        requete = 'SELECT "%s" FROM "%s"' % ('","'.join(lues), tables[0])
+        lues = ["lat", "lon"] + [c for c in champs if c in colonnes and c not in ("lat", "lon")]
+        requete = 'SELECT "%s" FROM "%s"' % ('","'.join(lues), table)
         return [dict(zip(lues, ligne)) for ligne in connexion.execute(requete)]
     finally:
         connexion.close()
@@ -212,36 +150,28 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Télécharge le référentiel des localités GRID3 (RDC) en GeoJSON."
     )
-    parser.add_argument("--provinces", nargs="+", default=PROVINCES_RDC,
-                        help="Provinces à écrire (défaut : les 26)")
+    ajouter_options(parser)
     parser.add_argument("--sortie", type=Path, default=None,
                         help="Dossier de sortie (défaut : data/)")
-    parser.add_argument("--archive", type=Path, default=None,
-                        help="Archive HDX déjà téléchargée (évite de la reprendre)")
     args = parser.parse_args()
 
     dossier_sortie = args.sortie or Path(__file__).resolve().parent.parent / "data"
     dossier_sortie.mkdir(parents=True, exist_ok=True)
 
-    print("Source : GRID3 COD – Settlement Names v8.0, via HDX (CC BY 4.0)\n")
+    print(f"Source : GRID3 COD – Settlement Names {VERSION}, via HDX (CC BY 4.0)\n")
 
     with tempfile.TemporaryDirectory() as temporaire:
-        dossier = Path(temporaire)
-        archive = args.archive or telecharger_archive(dossier / "settlement_names.zip")
-        fichiers = extraire(archive, dossier / "gpkg")
-
-        inconnues = [p for p in args.provinces if cle_province(p) not in fichiers]
-        if inconnues:
-            sys.exit(
-                f"Provinces absentes de l'archive : {', '.join(inconnues)}\n"
-                f"Orthographes acceptées : {', '.join(PROVINCES_RDC)}"
-            )
+        sources = sources_par_province(
+            "settlement_names", args.provinces, Path(temporaire), cache=args.cache,
+            archive=args.archive, paquets=not args.sans_paquets_provinciaux)
+        print()
 
         total_ecrit = 0
         resume = []
 
         for province in args.provinces:
-            lignes = lire_geopackage(fichiers[cle_province(province)])
+            chemin_gpkg, table, _ = sources[cle_province(province)]
+            lignes = lire_geopackage(chemin_gpkg, table)
             features, rejets, doublons = nettoyer(lignes)
 
             chemin = dossier_sortie / f"grid3_{slug(province)}.geojson"
@@ -255,6 +185,8 @@ def main() -> None:
                 ecarts.append(f"{rejets} rejetées")
             if doublons:
                 ecarts.append(f"{doublons} doublons")
+            if table is not None:
+                ecarts.append("paquet provincial")
             detail = f"  ({', '.join(ecarts)})" if ecarts else ""
             print(f"{province:<16} {len(features):>7} localités   {taille_mo:>5.2f} Mo{detail}")
 
